@@ -379,6 +379,29 @@ main { flex: 1; padding: 24px 18px 60px; min-width: 0; }
 .ship-track-row { font-size: 13px; background: var(--green-bg); color: var(--green-tx); border-radius: 10px; padding: 10px 12px; font-weight: 700; }
 .ship-track-row a { color: var(--green-tx); text-decoration: underline; }
 
+/* ---------- Message thread ---------- */
+.quote-edit-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.thread { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; padding: 2px; }
+.bubble {
+  max-width: 85%; border-radius: 14px; padding: 9px 13px; font-size: 13.5px; line-height: 1.5;
+  background: var(--warm); border: 1px solid var(--border-soft); align-self: flex-start;
+}
+.bubble.mine { background: var(--pink-soft); border-color: #F5C9D4; align-self: flex-end; }
+.bubble.system { background: none; border: none; color: var(--muted); font-size: 12px; font-weight: 700; align-self: center; text-align: center; }
+.bubble .who { font-size: 11px; font-weight: 800; color: var(--text-2); margin-bottom: 2px; }
+.bubble img { max-width: 100%; border-radius: 10px; margin-top: 6px; display: block; }
+.bubble .when { font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+.composer { margin-top: 10px; }
+.composer textarea {
+  width: 100%; box-sizing: border-box; font-family: inherit; font-size: 14px; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--warm); color: var(--ink); resize: vertical;
+}
+.composer-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.composer-attach { cursor: pointer; font-size: 16px; display: flex; align-items: center; gap: 6px; }
+.composer-attach span { font-size: 11.5px; font-weight: 700; color: var(--pink-deep); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer-row .btn-primary { margin-left: auto; }
+.approval-chip-row { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+
 /* ---------- Task highlight (deep link from email) ---------- */
 .task-card.highlight { border-color: var(--pink); box-shadow: 0 0 0 3px var(--pink-soft); }
 

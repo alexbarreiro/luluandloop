@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
         (session as unknown as Record<string, any>).collected_information?.shipping_details ?? null;
       const { error } = await supabase.from("orders").update({
         pending: false,
-        stage: 2, // Queue · paid
+        stage: 0, // New request — deposit is always paid upfront
         deposit_paid_at: new Date().toISOString(),
         deposit_ref: ref,
         shipping_name: ship?.name ?? null,

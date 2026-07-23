@@ -10,18 +10,21 @@
   var esc = window.LuluAPI.esc;
   var STAGES = window.LuluAPI.STAGES;
   var PILLARS = window.LuluAPI.PILLARS;
-  var STAGE_DOTS = ['#B6B1BC', '#C08A3E', '#8A6FA8', '#5E8B6A', '#E4657E', '#5B7A99'];
+  var STAGE_DOTS = ['#B6B1BC', '#C08A3E', '#5E8B6A', '#E4657E', '#5B7A99'];
   // Demo gate passphrase hash (see README to change); unused in cloud mode
   var PASS_HASH = '0f89c4839feb69124c67993c766c582abd71c3e3703e5073eae12e623ee75119';
 
   var state = { view: 'board', selected: null, me: null,
     profiles: [], orders: [], tasks: [], reports: [], payouts: [], shares: [],
+    emailLog: [], thread: [], threadOrder: null,
     shipRates: null, customerQuery: '', highlightTask: null };
 
   function $(id) { return document.getElementById(id); }
   function fmt(n) { return '$' + Math.round(n); }
-  function dep(o) { return Math.round(o.price * .4); }
-  function bal(o) { return o.price - dep(o); }
+  // Prefer the stored amounts — after a quote edit the deposit stays fixed
+  // while the balance absorbs the change, so 40/60 recomputation would drift
+  function dep(o) { return o.deposit != null ? Number(o.deposit) : Math.round(o.price * .4); }
+  function bal(o) { return o.balance != null ? Number(o.balance) : o.price - dep(o); }
   function profile(id) { return state.profiles.find(function (p) { return p.id === id; }); }
   function isOwner() { return state.me && state.me.role === 'owner'; }
   function isManager() { return state.me && (state.me.role === 'owner' || state.me.role === 'supervisor'); }
@@ -48,6 +51,18 @@
     return /^#[0-9A-Fa-f]{6}$/.test(String(c)) ? c : '#8A6FA8';
   }
 
+  // Client-side stage-transition guard (the DB trigger enforces the same rules)
+  function advanceGuard(o, target) {
+    if ((target === 2 || target === 3) && !o.artisan_id) {
+      return 'Assign an artisan before moving to “' + STAGES[target] + '”';
+    }
+    if (target === 4 && S.mode === 'cloud') {
+      if (!o.approved_at) return 'The customer must approve the finished piece first';
+      if (!balPaid(o)) return 'The balance must be paid before shipping';
+    }
+    return null;
+  }
+
   /* ---------- Data refresh ---------- */
   function refresh() {
     var mine = isManager() ? null : state.me.id;
@@ -57,7 +72,8 @@
       S.listTasks(mine),
       S.listReports(null),
       isOwner() ? S.listPayouts() : Promise.resolve([]),
-      isManager() ? S.listCustomerUploads().catch(function () { return []; }) : Promise.resolve([])
+      isManager() ? S.listCustomerUploads().catch(function () { return []; }) : Promise.resolve([]),
+      isManager() ? S.listEmailLog().catch(function () { return []; }) : Promise.resolve([])
     ];
     return Promise.all(loads).then(function (r) {
       state.profiles = r[0];
@@ -66,6 +82,7 @@
       state.reports = r[3];
       state.payouts = r[4];
       state.shares = r[5];
+      state.emailLog = r[6];
     }).catch(function (e) { toast('Could not load data: ' + e.message, true); });
   }
 
@@ -77,8 +94,8 @@
   function balPaid(o) { return !!o.balance_paid_at; }
   function payChip(o) {
     if (balPaid(o)) return { label: 'paid in full', cls: 'green' };
-    if (o.stage === 4 && depPaid(o)) return o.balance_sent_at ? { label: 'bal. link sent', cls: 'pinky' } : { label: 'balance due', cls: 'pinky' };
-    if (depPaid(o)) return { label: '40% paid', cls: 'soft' };
+    if (o.stage === 3) return o.balance_sent_at ? { label: 'bal. link sent', cls: 'pinky' } : { label: 'balance due', cls: 'pinky' };
+    if (depPaid(o)) return { label: 'deposit paid', cls: 'soft' };
     return { label: 'no payment', cls: 'mute' };
   }
 
@@ -127,10 +144,10 @@
     var tiles;
     if (isManager()) {
       var orders = state.orders;
-      var openCount = orders.filter(function (o) { return o.stage < 5; }).length;
-      var depositsHeld = orders.filter(function (o) { return depPaid(o) && o.stage < 5 && !balPaid(o); })
+      var openCount = orders.filter(function (o) { return o.stage < 4; }).length;
+      var depositsHeld = orders.filter(function (o) { return depPaid(o) && o.stage < 4 && !balPaid(o); })
         .reduce(function (a, o) { return a + dep(o); }, 0);
-      var balanceDue = orders.filter(function (o) { return o.stage === 4 && depPaid(o) && !balPaid(o); })
+      var balanceDue = orders.filter(function (o) { return o.stage === 3 && !balPaid(o); })
         .reduce(function (a, o) { return a + bal(o); }, 0);
       // Cloud mode has real payment dates → scope revenue to the current month;
       // demo stamps are the sentinel 'demo' (no dates) → show total received.
@@ -147,10 +164,10 @@
       tiles = [
         { label: 'Open orders', value: String(openCount), sub: orders.filter(function (o) { return o.stage === 0; }).length + ' new this week' },
         { label: 'Deposits held', value: fmt(depositsHeld), sub: '40% upfront · Stripe' },
-        { label: 'Balance outstanding', value: fmt(balanceDue), sub: orders.filter(function (o) { return o.stage === 4 && depPaid(o) && !balPaid(o); }).length + ' pieces ready' },
+        { label: 'Balance outstanding', value: fmt(balanceDue), sub: orders.filter(function (o) { return o.stage === 3 && !balPaid(o); }).length + ' pieces ready' },
         { label: monthScoped ? month + ' revenue' : 'Revenue received', value: fmt(received), sub: 'via Stripe' }];
     } else {
-      var mine = state.orders.filter(function (o) { return o.artisan_id === state.me.id && o.stage >= 1 && o.stage < 5; });
+      var mine = state.orders.filter(function (o) { return o.artisan_id === state.me.id && o.stage >= 1 && o.stage < 4; });
       var open = state.tasks.filter(function (t) { return t.status === 'open'; });
       var soon = open.filter(function (t) {
         return t.due_date && (new Date(t.due_date) - new Date()) < 3 * 864e5;
@@ -177,7 +194,7 @@
         var artisan = o.artisan_id && profile(o.artisan_id)
           ? '<span class="artisan-chip" style="color:' + safeColor(profile(o.artisan_id).color) + '">' + esc(profile(o.artisan_id).name.split(' ')[0]) + '</span>'
           : '<span class="artisan-chip" style="color:#B6B1BC">＋ assign</span>';
-        var quick = (isManager() && o.stage < 5)
+        var quick = (isManager() && o.stage < 4)
           ? '<button type="button" class="quick-advance" data-advance="' + esc(o.code) + '" ' +
             'title="Advance to ' + esc(STAGES[o.stage + 1]) + '" aria-label="Advance to ' + esc(STAGES[o.stage + 1]) + '">›</button>'
           : '';
@@ -204,10 +221,12 @@
         ev.stopPropagation();
         var o = state.orders.find(function (x) { return x.code === el.getAttribute('data-advance'); });
         if (!o) return;
+        var guardMsg = advanceGuard(o, Math.min(4, o.stage + 1));
+        if (guardMsg) { toast(guardMsg, true); return; }
         el.disabled = true;
-        S.updateOrder(o.code, { stage: Math.min(5, o.stage + 1) })
+        S.updateOrder(o.code, { stage: Math.min(4, o.stage + 1) })
           .then(refresh).then(renderAll)
-          .then(function () { toast(o.code.slice(-4) + ' → ' + STAGES[Math.min(5, o.stage + 1)]); })
+          .then(function () { toast(o.code.slice(-4) + ' → ' + STAGES[Math.min(4, o.stage + 1)]); })
           .catch(function (err) { el.disabled = false; toast(err.message, true); });
       });
     });
@@ -217,7 +236,7 @@
   function renderTeam() {
     var artisans = state.profiles.filter(function (p) { return p.active; });
     $('view-team').innerHTML = artisans.map(function (a) {
-      var pieces = state.orders.filter(function (o) { return o.artisan_id === a.id && o.stage >= 1 && o.stage < 5; });
+      var pieces = state.orders.filter(function (o) { return o.artisan_id === a.id && o.stage >= 1 && o.stage < 4; });
       var load = pieces.length, cap = a.capacity || 4;
       var pct = Math.min(100, Math.round(load / cap * 100));
       var chipCls = load >= cap ? 'pinky' : load === 0 ? 'green' : 'soft';
@@ -251,7 +270,7 @@
         rows.push({ item: o.item, customer: o.customer, type: 'Balance 60%', amount: fmt(bal(o)),
           status: 'succeeded', cls: 'green',
           ref: o.balance_ref || (demo ? 'pi_3Q' + o.code.slice(-4) + 'bFn' : '—') });
-      } else if (o.stage === 4 && depPaid(o)) {
+      } else if (o.stage === 3) {
         rows.push({ item: o.item, customer: o.customer, type: 'Balance 60%', amount: fmt(bal(o)),
           status: o.balance_sent_at ? 'link sent · pending' : 'not requested',
           cls: o.balance_sent_at ? 'amber' : 'mute',
@@ -277,7 +296,7 @@
           ? '<span class="chip amber">supervisor</span>'
           : '<span class="chip soft">artisan</span>';
       var activeChip = p.active ? '<span class="chip green">active</span>' : '<span class="chip mute">deactivated</span>';
-      var load = state.orders.filter(function (o) { return o.artisan_id === p.id && o.stage >= 1 && o.stage < 5; }).length;
+      var load = state.orders.filter(function (o) { return o.artisan_id === p.id && o.stage >= 1 && o.stage < 4; }).length;
       return '<div class="team-card' + (p.active ? '' : ' inactive') + '">' +
         '<div class="team-head">' +
         '<div class="team-avatar" style="background:' + safeColor(p.color) + '">' + esc(p.name[0]) + '</div>' +
@@ -445,7 +464,7 @@
     var people = state.profiles.filter(function (p) { return p.active; }).map(function (p) {
       return '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>';
     }).join('');
-    var orders = state.orders.filter(function (o) { return o.stage < 5; }).map(function (o) {
+    var orders = state.orders.filter(function (o) { return o.stage < 4; }).map(function (o) {
       return '<option value="' + esc(o.code) + '">' + esc(o.code.slice(-4) + ' · ' + o.item) + '</option>';
     }).join('');
     openModal('New task',
@@ -571,7 +590,20 @@
         '<div class="customer-body" hidden>' +
         (c.address ? '<div class="cust-address">📦 ' + esc(c.shipName || c.name) + ' — ' + esc(formatAddress(c.address)) + '</div>'
           : '<div class="cust-address muted">No shipping address on file yet (collected at deposit checkout).</div>') +
-        ordersHtml + '</div></div>';
+        ordersHtml +
+        (function () {
+          var emails = state.emailLog.filter(function (e) {
+            return c.email && e.to_email && e.to_email.toLowerCase() === c.email.toLowerCase();
+          });
+          if (!emails.length) return '';
+          return '<div class="drawer-section-title" style="margin-top:14px">Emails we sent (' + emails.length + ')</div>' +
+            emails.slice(0, 12).map(function (e) {
+              return '<div class="cust-order" style="cursor:default"><span class="chip mute">' + esc(e.kind.replace(/_/g, ' ')) + '</span>' +
+                '<span class="cust-order-item">' + esc(e.subject) + '</span>' +
+                '<span class="team-role">' + esc(fmtDate(e.created_at)) + '</span></div>';
+            }).join('');
+        })() +
+        '</div></div>';
     }).join('') || '<div class="empty-note">No customers yet.</div>';
 
     Array.prototype.forEach.call(document.querySelectorAll('.customer-head'), function (b) {
@@ -591,7 +623,7 @@
   function renderPayouts() {
     var artisans = state.profiles.filter(function (p) { return p.role === 'artisan'; });
     $('payout-grid').innerHTML = artisans.map(function (a) {
-      var shipped = state.orders.filter(function (o) { return o.artisan_id === a.id && o.stage >= 5; });
+      var shipped = state.orders.filter(function (o) { return o.artisan_id === a.id && o.stage >= 4; });
       var gross = shipped.reduce(function (s, o) { return s + Number(o.price); }, 0);
       var share = Math.round(gross * 0.4 * 100) / 100;
       var paidOut = state.payouts.filter(function (p) { return p.artisan_id === a.id; })
@@ -633,7 +665,7 @@
           if (p.artisan_id === a.id) (p.order_codes || []).forEach(function (c) { already[c] = true; });
         });
         var shippedCodes = state.orders.filter(function (o) {
-          return o.artisan_id === a.id && o.stage >= 5 && !already[o.code];
+          return o.artisan_id === a.id && o.stage >= 4 && !already[o.code];
         }).map(function (o) { return o.code; });
         b.disabled = true;
         S.recordPayout(a.id, amount, shippedCodes)
@@ -646,8 +678,8 @@
 
   /* ---------- My pieces (artisan) ---------- */
   function renderMyPieces() {
-    var mine = state.orders.filter(function (o) { return o.artisan_id === state.me.id && o.stage >= 1 && o.stage < 5; });
-    var done = state.orders.filter(function (o) { return o.artisan_id === state.me.id && o.stage >= 5; }).slice(0, 4);
+    var mine = state.orders.filter(function (o) { return o.artisan_id === state.me.id && o.stage >= 1 && o.stage < 4; });
+    var done = state.orders.filter(function (o) { return o.artisan_id === state.me.id && o.stage >= 4; }).slice(0, 4);
     function card(o, finished) {
       var reports = state.reports.filter(function (r) { return (r.order_code || '') === o.code; }).slice(0, 2);
       var repHtml = reports.map(function (r) {
@@ -661,6 +693,8 @@
         '<div class="piece-meta">' + esc(o.customer) + ' · ' + esc(o.code.slice(-4)) + ' · ' + esc(o.size_label || '') + '</div>' +
         '<div class="piece-desc">“' + esc(o.desc_text) + '”</div>' +
         '<div class="piece-foot"><span class="chip ' + (finished ? 'green' : 'soft') + '">' + esc(STAGES[o.stage]) + '</span>' +
+        // artisans communicate with the customer once the piece is In progress
+        (o.stage >= 2 ? '<button class="btn-mini" data-thread="' + esc(o.code) + '">💬 Customer</button>' : '') +
         (finished ? '' : '<button class="btn-primary btn-sm" data-report="' + esc(o.code) + '">Report progress →</button>') +
         '</div>' + repHtml + '</div></div>';
     }
@@ -671,18 +705,34 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-report]'), function (b) {
       b.addEventListener('click', function () { openReportModal(b.getAttribute('data-report')); });
     });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-thread]'), function (b) {
+      b.addEventListener('click', function () {
+        var o = state.orders.find(function (x) { return x.code === b.getAttribute('data-thread'); });
+        if (o) openThreadModal(o);
+      });
+    });
+  }
+
+  function openThreadModal(o) {
+    openModal('Messages — ' + o.item + ' · ' + o.code.slice(-4),
+      '<div class="thread" id="modal-thread"></div>' +
+      '<div class="composer">' +
+      '<textarea id="mmsg-body" rows="2" placeholder="Write to ' + esc(o.customer) + '… (WIP photos welcome!)"></textarea>' +
+      '<div class="composer-row">' +
+      '<label class="composer-attach">📎<input type="file" id="mmsg-file" accept="image/*,video/*" hidden><span id="mmsg-file-name"></span></label>' +
+      '<button class="btn-primary btn-sm" id="btn-mmsg-send">Send</button></div></div>');
+    loadThread(o, $('modal-thread'));
+    bindComposer(function () { return o; }, 'mmsg-body', 'mmsg-file', 'mmsg-file-name', 'btn-mmsg-send',
+      function () { return $('modal-thread'); });
   }
 
   function openReportModal(code) {
     var o = state.orders.find(function (x) { return x.code === code; });
     if (!o) return;
-    // Artisans may move a piece to 'In progress' (3) or 'Ready' (4) once the
-    // deposit is paid; payment-driven stages and shipping are not theirs to set.
+    // Artisans may move In progress (2) → Ready (3); managers own the rest.
     var opts = ['<option value="' + o.stage + '" selected>Stay in “' + STAGES[o.stage] + '” (progress note)</option>'];
-    if (depPaid(o)) {
-      [3, 4].forEach(function (s) {
-        if (s > o.stage) opts.push('<option value="' + s + '">Move to “' + STAGES[s] + '”</option>');
-      });
+    if (o.stage === 2) {
+      opts.push('<option value="3">Move to “' + STAGES[3] + '”</option>');
     }
     openModal('Report progress — ' + o.item,
       '<form id="report-form" class="modal-form">' +
@@ -764,7 +814,7 @@
     var sel = $('drawer-artisan');
     var artisans = state.profiles.filter(function (p) { return p.active; });
     sel.innerHTML = '<option value="">— Unassigned —</option>' + artisans.map(function (a) {
-      var load = state.orders.filter(function (x) { return x.artisan_id === a.id && x.stage >= 1 && x.stage < 5; }).length;
+      var load = state.orders.filter(function (x) { return x.artisan_id === a.id && x.stage >= 1 && x.stage < 4; }).length;
       var specialty = (a.specialty || a.role).split(',')[0].toLowerCase();
       return '<option value="' + esc(a.id) + '">' + esc(a.name + ' — ' + specialty + ' (' + load + '/' + (a.capacity || 4) + ')') + '</option>';
     }).join('');
@@ -779,13 +829,13 @@
     }).join('') || '<div class="empty-note small">No progress reports yet.</div>';
 
     var adv = $('drawer-advance');
-    if (o.stage < 5) {
+    if (o.stage < 4) {
       adv.hidden = false;
-      adv.textContent = o.stage === 4 ? 'Mark shipped 🎁' : 'Advance to “' + STAGES[o.stage + 1] + '”';
+      adv.textContent = o.stage === 3 ? 'Mark shipped 🎁' : 'Advance to “' + STAGES[o.stage + 1] + '”';
     } else adv.hidden = true;
 
     var row = $('shipping-row');
-    if (o.stage === 4 && !o.balance_sent_at && !balPaid(o)) {
+    if (o.stage === 3 && !o.balance_sent_at && !balPaid(o)) {
       row.hidden = false;
       var rate = o.shipping_rate;
       $('drawer-balance-link').textContent = rate
@@ -795,14 +845,142 @@
       $('shipping-row').querySelector('label').hidden = !!rate;
     } else row.hidden = true;
 
+    // Quote editing (managers, while in New request / Quote review)
+    $('quote-edit-row').hidden = !(isManager() && o.stage <= 1);
+
+    renderApproval(o);
     renderShipping(o);
     renderShares(o);
+    loadThread(o, $('drawer-thread'));
+  }
+
+  /* ---------- Drawer: customer approval (stage 3 · Ready) ---------- */
+  function approvalRequested(o) {
+    return state.threadOrder === o.code && state.thread.some(function (m) { return m.kind === 'approval_request'; });
+  }
+
+  function renderApproval(o) {
+    var section = $('drawer-approval-section');
+    if (!isManager() || o.stage !== 3) { section.hidden = true; return; }
+    section.hidden = false;
+    var html = '<div class="approval-chip-row">';
+    if (o.approved_at) {
+      html += '<span class="chip green">✓ approved by the customer</span>';
+    } else if (state.threadOrder === o.code && !state.threadLoaded) {
+      html += '<span class="chip mute">checking…</span>';
+    } else if (approvalRequested(o)) {
+      html += '<span class="chip amber">waiting for customer approval</span>';
+    } else {
+      html += '<span class="chip mute">not sent yet</span>';
+    }
+    html += balPaid(o) ? '<span class="chip green">✓ balance paid</span>'
+      : '<span class="chip mute">balance unpaid</span>';
+    if (!o.approved_at) {
+      html += '<button class="btn-primary btn-sm" id="btn-send-approval">' +
+        (approvalRequested(o) ? 'Re-send for approval' : 'Send final photo for approval & balance →') + '</button>';
+    }
+    html += '</div>';
+    $('approval-status').innerHTML = html;
+    var btn = $('btn-send-approval');
+    if (btn) btn.addEventListener('click', function () { openApprovalModal(o); });
+  }
+
+  function openApprovalModal(o) {
+    openModal('Send for approval — ' + o.item,
+      '<form id="approval-form" class="modal-form">' +
+      '<label>Final photo <input id="ap-file" type="file" accept="image/*" required></label>' +
+      '<label>Message to the customer <textarea id="ap-note" rows="3" placeholder="She’s finished and even prettier in person…"></textarea></label>' +
+      '<div class="field-note">This emails the customer the photo with an approve button and the balance payment link' +
+      (o.balance_url ? '' : (o.shipping_rate ? ' (link will be created with the chosen shipping rate)' : ' — ⚠ choose a shipping rate first so the balance includes shipping')) + '.</div>' +
+      '<div class="modal-error" id="modal-error"></div>' +
+      '<button type="submit" class="btn-primary">Send to customer</button>' +
+      '</form>');
+    $('approval-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var file = $('ap-file').files[0];
+      if (!file) { $('modal-error').textContent = 'Attach the final photo.'; return; }
+      var pre = Promise.resolve();
+      if (!o.balance_url && !balPaid(o)) {
+        if (!o.shipping_rate && S.mode === 'cloud') {
+          $('modal-error').textContent = 'Choose a shipping rate first (Shipping section) so the balance includes it.';
+          return;
+        }
+        pre = S.sendBalanceLink(o, o.shipping_rate ? null : 0);
+      }
+      pre.then(function () {
+        return S.sendMessage(o, { kind: 'approval_request', body: $('ap-note').value.trim(), file: file });
+      }).then(function () { closeModal(); return refresh(); }).then(function () {
+        renderAll();
+        toast('Sent — the customer got the photo, approve button and payment link');
+      }).catch(function (err) { $('modal-error').textContent = err.message; });
+    });
+  }
+
+  /* ---------- Message threads (drawer + artisan modal) ---------- */
+  function renderThread(container) {
+    container.innerHTML = state.thread.map(function (m) {
+      if (m.kind === 'system' || m.sender_kind === 'system') {
+        return '<div class="bubble system">' + esc(m.body) + '</div>';
+      }
+      var cls = m.sender_kind === 'staff' ? ' mine' : '';
+      var tag = m.kind === 'approval_request' ? ' <span class="chip pinky">approval request</span>' : '';
+      return '<div class="bubble' + cls + '">' +
+        '<div class="who">' + esc(m.sender_kind === 'staff' ? m.sender_name : m.sender_name + ' (customer)') + tag + '</div>' +
+        (m.body ? esc(m.body) : '') +
+        (m.photo_url ? '<img src="' + esc(m.photo_url) + '" alt="attachment">'
+          : (m.photo_name ? '<div class="when">📎 ' + esc(m.photo_name) + '</div>' : '')) +
+        '<div class="when">' + esc(fmtDate(m.created_at)) + '</div></div>';
+    }).join('') || '<div class="empty-note small">No messages yet — say hola 👋</div>';
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function loadThread(o, container) {
+    state.threadOrder = o.code;
+    state.thread = [];
+    state.threadLoaded = false;
+    S.listMessages(o).then(function (msgs) {
+      if (state.threadOrder !== o.code) return; // drawer moved on
+      state.thread = msgs;
+      state.threadLoaded = true;
+      if (container && document.contains(container)) renderThread(container);
+      var drawerOpen = !$('drawer-root').hidden;
+      if (drawerOpen && state.selected === o.code) renderApproval(o);
+    }).catch(function (e) { toast('Messages: ' + e.message, true); });
+  }
+
+  // Bind a composer once; the order + target container resolve at click time
+  function bindComposer(getOrder, bodyId, fileId, fileNameId, btnId, getContainer) {
+    var fileInput = $(fileId);
+    fileInput.addEventListener('change', function () {
+      $(fileNameId).textContent = fileInput.files[0] ? fileInput.files[0].name : '';
+    });
+    $(btnId).addEventListener('click', function () {
+      var o = getOrder();
+      if (!o) return;
+      var body = $(bodyId).value.trim();
+      var file = fileInput.files[0] || null;
+      if (!body && !file) return;
+      var btn = $(btnId);
+      btn.disabled = true;
+      S.sendMessage(o, { body: body, file: file }).then(function () {
+        btn.disabled = false;
+        // the modal/drawer may have closed mid-send — touch DOM defensively
+        var bodyEl = $(bodyId);
+        if (bodyEl) {
+          bodyEl.value = '';
+          fileInput.value = '';
+          $(fileNameId).textContent = '';
+        }
+        var container = getContainer();
+        if (container && document.contains(container)) loadThread(o, container);
+      }).catch(function (err) { btn.disabled = false; toast(err.message, true); });
+    });
   }
 
   /* ---------- Drawer: shipping (Shippo) ---------- */
   function renderShipping(o) {
     var section = $('drawer-shipping-section');
-    if (!isManager() || o.stage < 3) { section.hidden = true; return; }
+    if (!isManager() || o.stage < 2) { section.hidden = true; return; }
     section.hidden = false;
 
     $('ship-address').innerHTML = o.shipping_address
@@ -836,8 +1014,11 @@
       if (!o.label_url && S.mode === 'cloud') {
         actions = '<button class="btn-mini" id="btn-refresh-label">Fetch label PDF</button>';
       }
-      if (o.stage < 5) {
-        actions += '<button class="btn-primary btn-sm" id="btn-mark-shipped">Mark shipped 🎁 — customer gets tracking + photo request</button>';
+      if (o.stage < 4) {
+        var shipReady = S.mode === 'demo' || (o.approved_at && balPaid(o));
+        actions += shipReady
+          ? '<button class="btn-primary btn-sm" id="btn-mark-shipped">Mark shipped 🎁 — customer gets tracking + photo request</button>'
+          : '<span class="field-note">Shipping unlocks once the customer approves and the balance is paid.</span>';
       }
     } else {
       actions = '<button class="btn-mini" id="btn-get-rates">' +
@@ -899,7 +1080,7 @@
     var shipBtn = $('btn-mark-shipped');
     if (shipBtn) shipBtn.addEventListener('click', function () {
       shipBtn.disabled = true;
-      S.updateOrder(o.code, { stage: 5 }).then(refresh).then(renderAll)
+      S.updateOrder(o.code, { stage: 4 }).then(refresh).then(renderAll)
         .then(function () { toast('Shipped 🎁 — customer notified' + (S.mode === 'demo' ? ' (demo: no real email)' : '')); })
         .catch(function (err) { shipBtn.disabled = false; toast(err.message, true); });
     });
@@ -1102,10 +1283,36 @@
   $('drawer-advance').addEventListener('click', function () {
     var o = selectedOrder();
     if (!o) return;
-    S.updateOrder(o.code, { stage: Math.min(5, o.stage + 1) })
+    var guardMsg = advanceGuard(o, Math.min(4, o.stage + 1));
+    if (guardMsg) { toast(guardMsg, true); return; }
+    S.updateOrder(o.code, { stage: Math.min(4, o.stage + 1) })
       .then(refresh).then(renderAll)
       .catch(function (err) { toast(err.message, true); });
   });
+  $('btn-edit-quote').addEventListener('click', function () {
+    var o = selectedOrder();
+    if (!o) return;
+    openModal('Edit final price — ' + o.item,
+      '<form id="quote-form" class="modal-form">' +
+      '<div class="modal-task-recap">Deposit already paid: <b>' + fmt(dep(o)) + '</b> (fixed) · current total: <b>' + fmt(o.price) + '</b></div>' +
+      '<label>Final price (USD) <input id="qf-price" type="number" min="' + dep(o) + '" max="2000" step="1" value="' + Number(o.price) + '" required></label>' +
+      '<label>Note for the customer <span class="field-note">(optional — goes into the order thread)</span>' +
+      '<textarea id="qf-note" rows="2" placeholder="Added the tiny broom and hat you asked about"></textarea></label>' +
+      '<div class="modal-error" id="modal-error"></div>' +
+      '<button type="submit" class="btn-primary">Update quote</button>' +
+      '</form>');
+    $('quote-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var price = parseFloat($('qf-price').value);
+      S.updateQuote(o, price, $('qf-note').value.trim())
+        .then(function () { closeModal(); return refresh(); }).then(renderAll)
+        .then(function () { toast('Quote updated — the change is logged in the customer thread'); })
+        .catch(function (err) { $('modal-error').textContent = err.message; });
+    });
+  });
+  // Drawer composer (bound once; resolves the open order at click time)
+  bindComposer(selectedOrder, 'msg-body', 'msg-file', 'msg-file-name', 'btn-send-msg',
+    function () { return $('drawer-thread'); });
   $('drawer-balance-link').addEventListener('click', function () {
     var o = selectedOrder();
     if (!o) return;

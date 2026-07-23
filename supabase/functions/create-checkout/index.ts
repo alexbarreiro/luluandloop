@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
   }
 
   const name = String(body.name ?? "").trim().slice(0, 120);
-  const email = String(body.email ?? "").trim().slice(0, 200);
+  const email = String(body.email ?? "").trim().toLowerCase().slice(0, 200);
   const desc = String(body.desc ?? "").trim().slice(0, 2000);
   const colors = String(body.colors ?? "—").trim().slice(0, 300) || "—";
   const rush = Boolean(body.rush);

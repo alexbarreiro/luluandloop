@@ -19,7 +19,8 @@
     { id: 'mini-drop', label: 'Monthly mini drop', cadence: 'monthly' },
     { id: 'general', label: 'General task', cadence: '' }];
 
-  var STAGES = ['New request', 'Quoted', 'Queue · paid', 'In progress', 'Ready · balance', 'Shipped'];
+  // Deposit is always paid upfront: New request → Quote review → In progress → Ready → Shipped
+  var STAGES = ['New request', 'Quote review', 'In progress', 'Ready', 'Shipped'];
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -42,14 +43,14 @@
     { code: 'LU-2607-0158', customer: 'Julia P.', where_from: 'Austin, TX', item: 'Stroller blanket + rattle', size_label: 'Stroller · 30×36in', price: 165, stage: 0, artisan_id: '', img: '/assets/blanket-mint.jpg', desc_text: 'Mint with pink flowers for my niece — matching bunny rattle if possible.', colors: 'mint, rose', rush: false },
     { code: 'LU-2607-0154', customer: 'Isabel M.', where_from: 'Miami, FL', item: 'Fairy bear, birthday gift', size_label: 'Classic · 10in', price: 95, stage: 1, artisan_id: '', img: '/assets/bear-fairy.jpg', desc_text: 'A little bear with fairy wings and a sparkly tutu — she turns 6.', colors: 'taupe, glitter red', rush: true },
     { code: 'LU-2607-0159', customer: 'Amara B.', where_from: 'London, UK', item: 'Kids cardigan, sage', size_label: 'Cardigan · 4y', price: 110, stage: 1, artisan_id: 'p-yesenia', img: '/assets/squirrel-red.jpg', desc_text: 'Sage green with cream buttons, roomy fit for a tall 4-year-old.', colors: 'sage, cream', rush: false },
-    { code: 'LU-2607-0151', customer: 'Sofía R.', where_from: 'CDMX, MX', item: 'Magical guardian doll', size_label: 'Grand · 14in', price: 140, stage: 2, artisan_id: 'p-lulu', img: '/assets/doll-blonde.jpg', desc_text: 'Like the heroine from my childhood — long golden twin-tails, sailor collar, red bow.', colors: 'gold, navy, red', rush: false },
-    { code: 'LU-2607-0157', customer: 'Nadia K.', where_from: 'Toronto, CA', item: 'Party charms ×10, sea animals', size_label: 'Set · 2.5in ×10', price: 130, stage: 2, artisan_id: '', img: '/assets/bunny-overalls.jpg', desc_text: 'Ten mini sea friends for party favor bags — octopus, whale, turtle mix.', colors: 'ocean blues', rush: false },
-    { code: 'LU-2607-0148', customer: 'Priya S.', where_from: 'Boston, MA', item: 'Witch-cat with broom', size_label: 'Classic · 12in', price: 95, stage: 3, artisan_id: 'p-carmen', img: '/assets/witch-cat.jpg', desc_text: 'My daughter’s gray cat as a little witch — purple nose, black hat and dress, tiny broom.', colors: 'gray, black, purple', rush: false },
-    { code: 'LU-2607-0147', customer: 'Emma T.', where_from: 'Seattle, WA', item: 'Sunshine crib blanket', size_label: 'Crib · 36×48in', price: 240, stage: 3, artisan_id: 'p-marisol', img: '/assets/blanket-yellow.jpg', desc_text: 'Butter yellow with white bunnies along the corner, lace border.', colors: 'butter, white', rush: false },
-    { code: 'LU-2607-0156', customer: 'Diego R.', where_from: 'CDMX, MX', item: 'Coquette squirrel', size_label: 'Classic · 10in', price: 95, stage: 3, artisan_id: 'p-lulu', img: '/assets/squirrel-red.jpg', desc_text: 'A red squirrel in a green striped dress with a fluffy stole — like the one from your gallery, but with glasses.', colors: 'brick red, green', rush: false },
-    { code: 'LU-2607-0152', customer: 'Mark D.', where_from: 'NYC, NY', item: 'Little blue friend', size_label: 'Classic · 12in', price: 118, stage: 4, artisan_id: 'p-carmen', img: '/assets/doll-blue.jpg', desc_text: 'From my son’s drawing — blue guy, big ears, white hat and pants.', colors: 'sky blue, white', rush: true, balance_sent_at: 'demo' },
-    { code: 'LU-2607-0150', customer: 'Chloe N.', where_from: 'Paris, FR', item: 'Butterfly lovey', size_label: 'Lovey · 12×12in', price: 55, stage: 4, artisan_id: 'p-marisol', img: '/assets/blanket-white.jpg', desc_text: 'Small white lovey with a single butterfly, for a newborn photoshoot.', colors: 'ivory', rush: false },
-    { code: 'LU-2607-0153', customer: 'Hannah W.', where_from: 'Sydney, AU', item: 'Garden bunny in overalls', size_label: 'Grand · 14in', price: 140, stage: 5, artisan_id: 'p-yesenia', img: '/assets/bunny-overalls.jpg', desc_text: 'Cream bunny with gingham overalls and pink boots, floppy ears.', colors: 'cream, denim blue', rush: false }];
+    { code: 'LU-2607-0151', customer: 'Sofía R.', where_from: 'CDMX, MX', item: 'Magical guardian doll', size_label: 'Grand · 14in', price: 140, stage: 1, artisan_id: 'p-lulu', img: '/assets/doll-blonde.jpg', desc_text: 'Like the heroine from my childhood — long golden twin-tails, sailor collar, red bow.', colors: 'gold, navy, red', rush: false },
+    { code: 'LU-2607-0157', customer: 'Nadia K.', where_from: 'Toronto, CA', item: 'Party charms ×10, sea animals', size_label: 'Set · 2.5in ×10', price: 130, stage: 1, artisan_id: '', img: '/assets/bunny-overalls.jpg', desc_text: 'Ten mini sea friends for party favor bags — octopus, whale, turtle mix.', colors: 'ocean blues', rush: false },
+    { code: 'LU-2607-0148', customer: 'Priya S.', where_from: 'Boston, MA', item: 'Witch-cat with broom', size_label: 'Classic · 12in', price: 95, stage: 2, artisan_id: 'p-carmen', img: '/assets/witch-cat.jpg', desc_text: 'My daughter’s gray cat as a little witch — purple nose, black hat and dress, tiny broom.', colors: 'gray, black, purple', rush: false },
+    { code: 'LU-2607-0147', customer: 'Emma T.', where_from: 'Seattle, WA', item: 'Sunshine crib blanket', size_label: 'Crib · 36×48in', price: 240, stage: 2, artisan_id: 'p-marisol', img: '/assets/blanket-yellow.jpg', desc_text: 'Butter yellow with white bunnies along the corner, lace border.', colors: 'butter, white', rush: false },
+    { code: 'LU-2607-0156', customer: 'Diego R.', where_from: 'CDMX, MX', item: 'Coquette squirrel', size_label: 'Classic · 10in', price: 95, stage: 2, artisan_id: 'p-lulu', img: '/assets/squirrel-red.jpg', desc_text: 'A red squirrel in a green striped dress with a fluffy stole — like the one from your gallery, but with glasses.', colors: 'brick red, green', rush: false },
+    { code: 'LU-2607-0152', customer: 'Mark D.', where_from: 'NYC, NY', item: 'Little blue friend', size_label: 'Classic · 12in', price: 118, stage: 3, artisan_id: 'p-carmen', img: '/assets/doll-blue.jpg', desc_text: 'From my son’s drawing — blue guy, big ears, white hat and pants.', colors: 'sky blue, white', rush: true, balance_sent_at: 'demo' },
+    { code: 'LU-2607-0150', customer: 'Chloe N.', where_from: 'Paris, FR', item: 'Butterfly lovey', size_label: 'Lovey · 12×12in', price: 55, stage: 3, artisan_id: 'p-marisol', img: '/assets/blanket-white.jpg', desc_text: 'Small white lovey with a single butterfly, for a newborn photoshoot.', colors: 'ivory', rush: false },
+    { code: 'LU-2607-0153', customer: 'Hannah W.', where_from: 'Sydney, AU', item: 'Garden bunny in overalls', size_label: 'Grand · 14in', price: 140, stage: 4, artisan_id: 'p-yesenia', img: '/assets/bunny-overalls.jpg', desc_text: 'Cream bunny with gingham overalls and pink boots, floppy ears.', colors: 'cream, denim blue', rush: false }];
 
   var DEMO_TASKS = [
     { title: 'Reel: Priya’s witch-cat, sketch → piece', pillar: 'idea-to-piece', assignee_key: 'p-carmen', order_code: 'LU-2607-0148', details: 'Film the WIP next to the customer sketch; 20–30s, EN captions.', due_in: 2 },
@@ -61,7 +62,8 @@
     var K = {
       staff: 'luluandloop.demo.staff.v2',
       orders: 'luluandloop.orders',          // shared with the wizard
-      overrides: 'luluandloop.studio.overrides',
+      overrides: 'luluandloop.studio.overrides.v3',
+      messages: 'luluandloop.demo.messages',
       tasks: 'luluandloop.demo.tasks',
       reports: 'luluandloop.demo.reports',
       session: 'luluandloop.demo.session',
@@ -104,7 +106,9 @@
           id: w.code, code: w.code, customer: w.customer || 'Web order', email: w.email || '',
           where_from: w.where || 'Online',
           item: w.item || 'Custom piece', size_label: w.size || '—', price: w.price || 0,
-          stage: typeof w.stage === 'number' ? w.stage : 2, artisan_id: '',
+          // legacy wizard rows used the old 6-stage numbers — remap like schema_v3
+          stage: typeof w.stage === 'number' ? (w.stage > 1 ? Math.min(w.stage - 1, 4) : w.stage) : 0,
+          artisan_id: '',
           img: (typeof w.img === 'string' && /^\/assets\/[\w.-]+$/.test(w.img)) ? w.img : '/assets/doll-blonde.jpg',
           desc_text: w.desc || '', colors: w.colors || '—', rush: !!w.rush, pending: false
         });
@@ -118,14 +122,15 @@
           if (typeof x.artisan_id === 'string') o.artisan_id = x.artisan_id;
           if (x.balanceSent) o.balance_sent_at = o.balance_sent_at || 'demo';
           if (x.balance_sent_at) o.balance_sent_at = x.balance_sent_at;
-          ['shipping_rate', 'tracking_number', 'label_url', 'tracking_url'].forEach(function (k2) {
+          ['shipping_rate', 'tracking_number', 'label_url', 'tracking_url',
+            'price', 'deposit', 'balance', 'approved_at'].forEach(function (k2) {
             if (k2 in x) o[k2] = x[k2];
           });
         }
-        o.deposit = Math.round(o.price * .4);
-        o.balance = o.price - o.deposit;
-        if (o.stage >= 2) o.deposit_paid_at = o.deposit_paid_at || 'demo';
-        if (o.stage >= 5) o.balance_paid_at = o.balance_paid_at || 'demo';
+        if (o.deposit == null) o.deposit = Math.round(o.price * .4);
+        if (o.balance == null) o.balance = o.price - o.deposit;
+        o.deposit_paid_at = o.deposit_paid_at || 'demo'; // always paid upfront
+        if (o.stage >= 4) o.balance_paid_at = o.balance_paid_at || 'demo';
       });
       return all;
     }
@@ -150,15 +155,24 @@
           status: 'open', evidence_note: '', evidence_link: '', evidence_name: '', evidence_data: '',
           created_at: new Date().toISOString() });
       }
-      if (toStage === 3) {
+      if (toStage === 2) {
         addOnce('idea-to-piece', 'Reel: ' + order.item + ' — sketch → piece',
           'Film the WIP next to the customer’s reference. 20–30s vertical, tag #HechoConLulu.', 5);
       }
-      if (toStage === 5) {
+      if (toStage === 4) {
         addOnce('reveal-unboxing', 'Reveal: repost ' + order.customer + '’s unboxing',
           'When the customer shares their photo/video, ask permission and repost. Tag #HechoConLulu.', 14);
       }
       set(K.tasks, t);
+    }
+    function demoMessages(code) {
+      return (get(K.messages, {})[code] || []);
+    }
+    function pushDemoMessage(code, msg) {
+      var all = get(K.messages, {});
+      (all[code] = all[code] || []).push(msg);
+      set(K.messages, all);
+      return msg;
     }
     var DEMO_RATES = [
       { rate_id: 'demo-usps-p', provider: 'USPS', service: 'Priority Mail', amount: '11.85', currency: 'USD', days: 2 },
@@ -296,6 +310,39 @@
       refreshLabel: function () {
         return Promise.reject(new Error('No label PDFs in demo mode — configure Shippo to print real labels'));
       },
+      listMessages: function (order) {
+        var me = this.currentUser();
+        return Promise.resolve(demoMessages(order.code).map(function (m) {
+          return Object.assign({ mine: m.sender_id === (me && me.id) }, m);
+        }));
+      },
+      sendMessage: function (order, input) {
+        var me = this.currentUser();
+        var msg = { id: uid(), sender_kind: 'staff', sender_id: me ? me.id : '',
+          sender_name: me ? me.name : 'Staff', kind: input.kind || 'chat',
+          body: input.body || '', photo_url: '', photo_name: input.file ? input.file.name : '',
+          created_at: new Date().toISOString() };
+        var finish = function () { pushDemoMessage(order.code, msg); return msg; };
+        if (input.file && input.file.size <= 400 * 1024 && /^image\//.test(input.file.type)) {
+          return new Promise(function (resolve) {
+            var rd = new FileReader();
+            rd.onload = function () { msg.photo_url = String(rd.result); resolve(finish()); };
+            rd.onerror = function () { resolve(finish()); };
+            rd.readAsDataURL(input.file);
+          });
+        }
+        return Promise.resolve(finish());
+      },
+      updateQuote: function (order, price, note) {
+        var deposit = Number(order.deposit);
+        if (price < deposit) return Promise.reject(new Error('price can’t be below the paid deposit ($' + deposit + ')'));
+        var balance = Math.round((price - deposit) * 100) / 100;
+        saveOverride(order.code, { price: price, deposit: deposit, balance: balance });
+        this.sendMessage(order, { kind: 'system',
+          body: 'Quote updated: $' + order.price + ' → $' + price + ' (deposit paid $' + deposit + ' · balance $' + balance + ')' + (note ? ' — ' + note : '') });
+        return Promise.resolve({ price: price, balance: balance });
+      },
+      listEmailLog: function () { return Promise.resolve([]); },
       listPayouts: function () { return Promise.resolve(get('luluandloop.demo.payouts', [])); },
       recordPayout: function (artisanId, amount, orderCodes) {
         var ps = get('luluandloop.demo.payouts', []);
@@ -399,7 +446,7 @@
         }
         return upload.then(function () {
           // same-stage "progress note" reports must not touch the stage —
-          // artisan RLS only allows stage writes into 3/4
+          // artisan RLS only allows stage writes into 2/3 (In progress/Ready)
           if (toStage === order.stage) return { error: null };
           return sb().from('orders').update({ stage: toStage }).eq('id', order.id);
         }).then(function (r) {
@@ -503,6 +550,47 @@
       },
       refreshLabel: function (order) {
         return callFn('shippo', { action: 'refresh-label', order_id: order.id });
+      },
+      listMessages: function (order) {
+        var me = meCache;
+        return sb().from('messages')
+          .select('id, sender_kind, sender_id, sender_name, kind, body, photo_path, created_at')
+          .eq('order_id', order.id).order('created_at').then(function (r) {
+            if (r.error) fail(r.error);
+            var rows = r.data || [];
+            return Promise.all(rows.map(function (m) {
+              m.mine = m.sender_id === (me && me.id);
+              m.photo_name = m.photo_path ? m.photo_path.split('/').pop() : '';
+              if (!m.photo_path) { m.photo_url = ''; return m; }
+              return sb().storage.from('evidence').createSignedUrl(m.photo_path, 3600)
+                .then(function (s) { m.photo_url = s.data ? s.data.signedUrl : ''; return m; });
+            }));
+          });
+      },
+      sendMessage: function (order, input) {
+        var me = meCache;
+        var photoPath = null;
+        var upload = Promise.resolve();
+        if (input.file && me) {
+          photoPath = 'chat/' + order.code + '/' + Date.now() + '-' + input.file.name.replace(/[^\w.-]+/g, '_');
+          upload = sb().storage.from('evidence').upload(photoPath, input.file).then(function (r) {
+            if (r.error) fail(r.error);
+          });
+        }
+        return upload.then(function () {
+          return sb().from('messages').insert({
+            order_id: order.id, sender_kind: 'staff', sender_id: me.id,
+            sender_name: me.name, kind: input.kind || 'chat',
+            body: input.body || '', photo_path: photoPath
+          });
+        }).then(function (r) { if (r.error) fail(r.error); });
+      },
+      updateQuote: function (order, price, note) {
+        return callFn('update-quote', { order_id: order.id, price: price, note: note || '' });
+      },
+      listEmailLog: function () {
+        return sb().from('email_log').select('*').order('created_at', { ascending: false }).limit(300)
+          .then(function (r) { if (r.error) fail(r.error); return r.data; });
       },
       listPayouts: function () {
         return sb().from('payouts').select('*').order('created_at', { ascending: false }).then(function (r) {

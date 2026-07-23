@@ -97,12 +97,13 @@
     balCard: 'Your piece is ready! Balance due',
     balCardSub: 'Pay the remaining 60% + shipping to release it. We never ship before you’ve seen finished photos.',
     balPay: 'Pay balance ·', again: 'Start another piece',
-    tl1: 'Deposit paid', tl1s: '40% received via Stripe. Lulu confirms your quote within 24h.',
-    tl2: 'In the queue', tl2s: 'Assigned to one of our five artisans, matched to the technique your piece needs.',
-    tl3: 'In progress', tl3s: 'Work-in-progress photos land in your inbox. Small tweaks welcome.',
-    tl4: 'Quality check', tl4s: 'Lulu inspects every stitch personally. Finished photos sent for your approval.',
-    tl5: 'Balance & shipping', tl5s: 'Remaining 60% + shipping via a secure Stripe link.',
-    tl6: 'Shipped 🎁', tl6s: 'Tracked worldwide, wrapped like the gift it is.',
+    portalCta: 'Track my order & message us',
+    portalHint: 'Your confirmation email has a magic link — or create an account with the same email to see all your pieces.',
+    tl1: 'Deposit paid', tl1s: '40% received via Stripe — your spot in the queue is secured.',
+    tl2: 'Quote review', tl2s: 'Lulu personally reviews your idea and confirms the final quote within 24h — any change lands in your order portal.',
+    tl3: 'In progress', tl3s: 'Your artisan gets to work. Work-in-progress photos and messages arrive in your portal and inbox.',
+    tl4: 'Ready — your approval', tl4s: 'You get the finished photos. Approve the piece and pay the balance + shipping; we never ship without your sign-off.',
+    tl5: 'Shipped 🎁', tl5s: 'Tracked worldwide, wrapped like the gift it is.',
     confEmail: 'confirmation sent to', yourEmail: 'your email',
     week: ' week', weeks: ' weeks',
     step1Chip: 'Design it', step2Chip: 'Deposit', step3Chip: 'Confirmed',
@@ -166,12 +167,13 @@
     balCard: '¡Tu pieza está lista! Saldo pendiente',
     balCardSub: 'Paga el 60% restante + envío para liberarla. Nunca enviamos sin que veas fotos de la pieza terminada.',
     balPay: 'Pagar saldo ·', again: 'Crear otra pieza',
-    tl1: 'Anticipo pagado', tl1s: '40% recibido vía Stripe. Lulu confirma tu cotización en 24h.',
-    tl2: 'En la fila', tl2s: 'Asignada a una de nuestras cinco artesanas, según la técnica que pide tu pieza.',
-    tl3: 'En proceso', tl3s: 'Fotos del avance llegan a tu correo. Pequeños ajustes bienvenidos.',
-    tl4: 'Control de calidad', tl4s: 'Lulu revisa cada puntada personalmente. Te mandamos fotos finales para tu visto bueno.',
-    tl5: 'Saldo y envío', tl5s: 'El 60% restante + envío con un enlace seguro de Stripe.',
-    tl6: 'Enviado 🎁', tl6s: 'Con rastreo a todo el mundo, envuelto como el regalo que es.',
+    portalCta: 'Ver mi pedido y escribirnos',
+    portalHint: 'Tu correo de confirmación trae un enlace mágico — o crea una cuenta con el mismo correo para ver todas tus piezas.',
+    tl1: 'Anticipo pagado', tl1s: '40% recibido vía Stripe — tu lugar en la fila está apartado.',
+    tl2: 'Revisión de cotización', tl2s: 'Lulu revisa tu idea personalmente y confirma la cotización final en 24h — cualquier cambio llega a tu portal.',
+    tl3: 'En proceso', tl3s: 'Tu artesana se pone manos a la obra. Fotos del avance y mensajes llegan a tu portal y correo.',
+    tl4: 'Lista — tu visto bueno', tl4s: 'Recibes las fotos finales. Apruebas la pieza y pagas el saldo + envío; nunca enviamos sin tu aprobación.',
+    tl5: 'Enviada 🎁', tl5s: 'Con rastreo a todo el mundo, envuelta como el regalo que es.',
     confEmail: 'confirmación enviada a', yourEmail: 'tu correo',
     week: ' semana', weeks: ' semanas',
     step1Chip: 'Diseña', step2Chip: 'Anticipo', step3Chip: 'Confirmado',
@@ -485,19 +487,20 @@
 
   function renderTimeline() {
     var tt = t();
-    var defs = [[tt.tl1, tt.tl1s], [tt.tl2, tt.tl2s], [tt.tl3, tt.tl3s], [tt.tl4, tt.tl4s], [tt.tl5, tt.tl5s], [tt.tl6, tt.tl6s]];
+    var defs = [[tt.tl1, tt.tl1s], [tt.tl2, tt.tl2s], [tt.tl3, tt.tl3s], [tt.tl4, tt.tl4s], [tt.tl5, tt.tl5s]];
     var doneCount = 1; // deposit paid; later stages advance server-side / by email
     $('timeline').innerHTML = defs.map(function (d, i) {
       var done = i < doneCount, active = i === doneCount;
       var dotCls = done ? 'done' : active ? 'active' : 'todo';
       var mark = done ? '✓' : (i + 1);
-      var line = i < 5 ? '<div class="tl-line"></div>' : '';
+      var line = i < 4 ? '<div class="tl-line"></div>' : '';
       var titleCls = done || active ? '' : ' future';
       return '<div class="tl-node"><div class="tl-rail"><div class="tl-dot ' + dotCls + '">' + mark + '</div>' + line + '</div>' +
         '<div class="tl-body"><div class="tl-title' + titleCls + '">' + esc(d[0]) + '</div>' +
         '<div class="tl-sub">' + esc(d[1]) + '</div></div></div>';
     }).join('');
     $('conf-email').textContent = tt.confEmail + ' ' + (state.form.email || tt.yourEmail);
+    $('btn-portal').href = '/orders/?code=' + encodeURIComponent(state.orderCode || '') + '&lang=' + state.lang;
     var q = quote();
     $('btn-balance').textContent = tt.balPay + ' ' + fmt(q.balance);
     if (state.orderCode) $('order-code').textContent = state.orderCode;
@@ -557,7 +560,7 @@
       where: 'Online',
       item: (state.lang === 'en' ? q.cat.en : q.cat.es) + ' · ' + (state.lang === 'en' ? q.sz.en : q.sz.es),
       size: (state.lang === 'en' ? q.sz.en : q.sz.es) + ' · ' + q.sz.dim,
-      price: q.total, stage: 2, artisan: '', img: q.cat.img,
+      price: q.total, stage: 0, artisan: '', img: q.cat.img,
       desc: f.desc, colors: composedColors() || '—', rush: f.rush,
       lang: state.lang, createdAt: new Date().toISOString()
     };

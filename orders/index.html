@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lulu &amp; Loop — My orders</title>
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800;6..12,900&display=swap" rel="stylesheet">
+<style>
+  :root { --page:#FFF8F0; --card:#FFFEFC; --border:#F0E2D8; --ink:#2A2A33; --t2:#6E6E7A;
+    --muted:#B6B1BC; --pink:#E4657E; --soft:#FBDDE6; --deep:#9A4B60; --warm:#FFF8F0; }
+  body { margin:0; background:var(--page); font-family:'Nunito Sans',system-ui,sans-serif; color:var(--ink); }
+  a { color: var(--pink); text-decoration: none; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 22px 16px 80px; }
+  .top { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+  .word { font-weight:900; font-size:21px; } .word .amp { color:var(--pink); }
+  .lang-t { display:flex; border:1px solid var(--border); border-radius:999px; overflow:hidden; }
+  .lang-t button { border:none; background:none; font:inherit; font-weight:800; font-size:12px; padding:7px 12px; cursor:pointer; color:var(--t2); }
+  .lang-t button.on { background:var(--ink); color:var(--page); }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:22px; margin-bottom:14px; }
+  h1 { font-weight:900; letter-spacing:-.02em; font-size:26px; margin:0 0 6px; }
+  h2 { font-weight:900; letter-spacing:-.02em; font-size:19px; margin:0 0 10px; }
+  p.sub { color:var(--t2); font-size:14.5px; line-height:1.6; margin:0 0 14px; }
+  input, textarea { width:100%; box-sizing:border-box; font-family:inherit; font-size:16px; padding:13px 14px;
+    border:1px solid var(--border); border-radius:12px; background:var(--warm); color:var(--ink); margin-bottom:10px; }
+  textarea { resize: vertical; }
+  .btn { border:none; cursor:pointer; background:var(--pink); color:#FFF4F2; font-weight:800; font-size:15px;
+    padding:14px 22px; border-radius:999px; font-family:inherit; width:100%; }
+  .btn:hover { background:var(--ink); } .btn:disabled { background:#EAE6E9; color:var(--muted); }
+  .btn.dark { background:var(--ink); color:var(--page); } .btn.dark:hover { background:var(--pink); }
+  .btn.mini { width:auto; font-size:13px; padding:10px 16px; }
+  .tabs { display:flex; gap:8px; margin-bottom:14px; }
+  .tabs button { flex:1; border:1px solid var(--border); background:var(--card); font:inherit; font-weight:800;
+    font-size:13.5px; padding:11px; border-radius:999px; cursor:pointer; color:var(--t2); }
+  .tabs button.on { background:var(--ink); color:var(--page); border-color:var(--ink); }
+  .err { color:var(--deep); font-size:13px; font-weight:700; margin:4px 0 8px; min-height:16px; }
+  .chip { display:inline-block; font-size:11.5px; font-weight:800; border-radius:999px; padding:4px 11px; }
+  .chip.pink { background:var(--soft); color:var(--deep); } .chip.green { background:#DFE9DD; color:#3E6B4A; }
+  .chip.mute { background:#F0EFED; color:var(--t2); }
+  .steps { display:flex; gap:4px; margin:14px 0; flex-wrap:wrap; }
+  .stepc { flex:1; min-width:70px; text-align:center; font-size:10.5px; font-weight:800; color:var(--muted);
+    padding-top:16px; position:relative; }
+  .stepc::before { content:''; position:absolute; top:0; left:0; right:0; height:6px; border-radius:99px; background:#EAE6E9; }
+  .stepc.done { color:var(--deep); } .stepc.done::before { background:var(--pink); }
+  .stepc.now { color:var(--ink); } .stepc.now::before { background:var(--soft); border:1px solid var(--pink); }
+  .meta { display:flex; justify-content:space-between; font-size:14px; padding:7px 0; border-bottom:1px dashed var(--border); }
+  .meta b { font-weight:800; } .meta:last-of-type { border-bottom:none; }
+  .thread { display:flex; flex-direction:column; gap:8px; max-height:380px; overflow-y:auto; margin-bottom:10px; }
+  .bubble { max-width:85%; border-radius:14px; padding:10px 13px; font-size:14px; line-height:1.5;
+    background:var(--warm); border:1px solid #F0EFED; align-self:flex-start; }
+  .bubble.mine { background:var(--soft); border-color:#F5C9D4; align-self:flex-end; }
+  .bubble.system { background:none; border:none; color:var(--muted); font-size:12px; font-weight:700; align-self:center; text-align:center; }
+  .bubble .who { font-size:11px; font-weight:800; color:var(--t2); margin-bottom:2px; }
+  .bubble img { max-width:100%; border-radius:10px; margin-top:6px; display:block; }
+  .bubble .when { font-size:10.5px; color:var(--muted); margin-top:3px; }
+  .composer-row { display:flex; align-items:center; gap:10px; }
+  .attach { cursor:pointer; font-size:18px; display:flex; align-items:center; gap:6px; }
+  .attach span { font-size:11.5px; font-weight:700; color:var(--deep); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .approval { background:var(--soft); border-radius:16px; padding:16px; margin-bottom:14px; }
+  .approval img { width:100%; border-radius:12px; margin:10px 0; }
+  .order-row { display:flex; align-items:center; gap:10px; padding:13px 4px; border-bottom:1px dashed var(--border); cursor:pointer; }
+  .order-row:hover .item { color: var(--pink); }
+  .order-row .item { font-weight:800; font-size:14.5px; flex:1; }
+  .order-row .code { font-size:11.5px; font-weight:800; color:var(--pink); }
+  .muted { color:var(--muted); font-size:13px; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="word" href="/">Lulu <span class="amp">&amp;</span> Loop</a>
+    <div class="lang-t"><button id="l-en">EN</button><button id="l-es">ES</button></div>
+  </div>
+
+  <!-- Access: sign in / sign up / order code -->
+  <div class="card" id="v-access" hidden>
+    <h1 id="a-title"></h1>
+    <p class="sub" id="a-sub"></p>
+    <div class="tabs">
+      <button id="tab-signin" class="on"></button>
+      <button id="tab-signup"></button>
+    </div>
+    <div id="auth-form">
+      <input id="a-email" type="email" autocomplete="email">
+      <input id="a-pass" type="password" autocomplete="current-password">
+      <div class="err" id="a-err"></div>
+      <button class="btn" id="a-go"></button>
+    </div>
+    <p class="sub" style="margin-top:18px" id="a-note"></p>
+  </div>
+
+  <!-- Order list (account mode) -->
+  <div class="card" id="v-list" hidden>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <h2 id="list-title"></h2>
+      <button class="btn mini dark" id="btn-signout"></button>
+    </div>
+    <div id="order-list"></div>
+  </div>
+
+  <!-- Single order -->
+  <div id="v-order" hidden>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <h1 id="o-item"></h1><span class="chip pink" id="o-code"></span>
+      </div>
+      <div class="steps" id="o-steps"></div>
+      <div class="meta"><span id="m-total-label"></span><b id="m-total"></b></div>
+      <div class="meta"><span id="m-dep-label"></span><b id="m-dep"></b></div>
+      <div class="meta"><span id="m-bal-label"></span><b id="m-bal"></b></div>
+      <div class="meta" id="m-track-row" hidden><span id="m-track-label"></span><b><a id="m-track" target="_blank" rel="noopener noreferrer"></a></b></div>
+    </div>
+
+    <div class="approval" id="approval-card" hidden>
+      <h2 id="ap-title"></h2>
+      <div id="ap-photo"></div>
+      <p class="sub" id="ap-note" style="color:var(--deep)"></p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn" id="btn-approve" style="flex:1"></button>
+        <a class="btn dark" id="btn-pay-balance" style="flex:1;text-align:center;display:none"></a>
+      </div>
+      <div class="err" id="ap-err"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="t-title"></h2>
+      <div class="thread" id="thread"></div>
+      <textarea id="c-body" rows="2"></textarea>
+      <div class="composer-row">
+        <label class="attach">📎<input type="file" id="c-file" accept="image/*,video/*" hidden><span id="c-file-name"></span></label>
+        <button class="btn mini" id="c-send" style="margin-left:auto"></button>
+      </div>
+      <div class="err" id="c-err"></div>
+    </div>
+    <p class="sub" style="text-align:center"><a href="#" id="back-list" hidden></a></p>
+  </div>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  var cfg = window.LULU_CONFIG || {};
+  var cloud = !!(cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY);
+  var sb = cloud && window.supabase ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+  var params = new URLSearchParams(location.search);
+  var code = (params.get('code') || '').trim();
+  var token = (params.get('t') || '').trim();
+  var lang = params.get('lang') === 'es' ? 'es' : (localStorage.getItem('luluandloop.lang') || 'en');
+  if (lang !== 'es') lang = 'en';
+  var state = { order: null, messages: [], orders: [], jwt: null, email: null, mode: 'signin' };
+
+  var STR = { en: {
+    stages: ['New request', 'Quote review', 'In progress', 'Ready', 'Shipped'],
+    aTitle: 'My orders', aSub: 'Sign in to see all your pieces, message the studio and approve your finished piece. Your order link from email works too — no account needed.',
+    signin: 'Sign in', signup: 'Create account', email: 'Email', pass: 'Password (min 8 characters)',
+    go: 'Continue', aNote: 'Tip: use the same email you used at checkout and your orders appear automatically.',
+    listTitle: 'Your pieces', signout: 'Sign out',
+    total: 'Total', dep: 'Deposit paid', bal: 'Balance', balPaid: 'Balance paid ✓', track: 'Tracking',
+    tTitle: 'Messages with the studio', cPh: 'Write to Lulu & the team…', send: 'Send',
+    apTitle: 'Your piece is finished! 🎉',
+    approve: 'I love it — approve ✓', approved: 'Approved ✓ · thank you!',
+    pay: 'Pay balance', backList: '← All my orders',
+    empty: 'No messages yet — say hola 👋', wrongLink: 'That link doesn’t match an order. Check the email we sent you, or sign in.',
+    needAll: 'Email and password (8+ characters) required', shipIncl: '+ shipping'
+  }, es: {
+    stages: ['Nueva solicitud', 'Revisión de cotización', 'En proceso', 'Lista', 'Enviada'],
+    aTitle: 'Mis pedidos', aSub: 'Inicia sesión para ver tus piezas, escribirle al estudio y aprobar tu pieza terminada. El enlace de tu correo también funciona — sin cuenta.',
+    signin: 'Iniciar sesión', signup: 'Crear cuenta', email: 'Correo', pass: 'Contraseña (mín. 8 caracteres)',
+    go: 'Continuar', aNote: 'Tip: usa el mismo correo de tu compra y tus pedidos aparecen automáticamente.',
+    listTitle: 'Tus piezas', signout: 'Salir',
+    total: 'Total', dep: 'Anticipo pagado', bal: 'Saldo', balPaid: 'Saldo pagado ✓', track: 'Rastreo',
+    tTitle: 'Mensajes con el estudio', cPh: 'Escríbele a Lulu y al equipo…', send: 'Enviar',
+    apTitle: '¡Tu pieza está terminada! 🎉',
+    approve: 'Me encanta — aprobar ✓', approved: 'Aprobada ✓ · ¡gracias!',
+    pay: 'Pagar saldo', backList: '← Todos mis pedidos',
+    empty: 'Aún no hay mensajes — di hola 👋', wrongLink: 'Ese enlace no coincide con un pedido. Revisa el correo que te enviamos, o inicia sesión.',
+    needAll: 'Se necesita correo y contraseña (8+ caracteres)', shipIncl: '+ envío'
+  } };
+  function t() { return STR[lang]; }
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  function fnUrl() { return cfg.SUPABASE_URL + '/functions/v1/order-portal'; }
+  function portal(payload) {
+    var headers = { 'Content-Type': 'application/json' };
+    if (state.jwt) headers.Authorization = 'Bearer ' + state.jwt;
+    return fetch(fnUrl(), { method: 'POST', headers: headers, body: JSON.stringify(payload) })
+      .then(function (r) { return r.json().then(function (j) {
+        if (!r.ok || j.error) throw new Error(j.error || 'request failed');
+        return j; }); });
+  }
+
+  /* ---------- static labels ---------- */
+  function applyLabels() {
+    $('l-en').classList.toggle('on', lang === 'en');
+    $('l-es').classList.toggle('on', lang === 'es');
+    $('a-title').textContent = t().aTitle;
+    $('a-sub').textContent = t().aSub;
+    $('tab-signin').textContent = t().signin;
+    $('tab-signup').textContent = t().signup;
+    $('a-email').placeholder = t().email;
+    $('a-pass').placeholder = t().pass;
+    $('a-go').textContent = state.mode === 'signin' ? t().signin : t().signup;
+    $('a-note').textContent = t().aNote;
+    $('list-title').textContent = t().listTitle;
+    $('btn-signout').textContent = t().signout;
+    $('t-title').textContent = t().tTitle;
+    $('c-body').placeholder = t().cPh;
+    $('c-send').textContent = t().send;
+    $('back-list').textContent = t().backList;
+    document.documentElement.lang = lang;
+  }
+
+  /* ---------- views ---------- */
+  function show(view) {
+    ['v-access', 'v-list', 'v-order'].forEach(function (v) { $(v).hidden = v !== view; });
+  }
+
+  function renderOrder() {
+    var o = state.order;
+    $('o-item').textContent = o.item;
+    $('o-code').textContent = o.code;
+    $('o-steps').innerHTML = t().stages.map(function (name, i) {
+      var cls = i < o.stage ? ' done' : i === o.stage ? ' now' : '';
+      return '<div class="stepc' + cls + '">' + esc(name) + '</div>';
+    }).join('');
+    var shipping = Number(o.shipping) || 0;
+    $('m-total-label').textContent = t().total;
+    $('m-total').textContent = '$' + o.price + (o.rush ? ' ⚡' : '');
+    $('m-dep-label').textContent = t().dep;
+    $('m-dep').textContent = '$' + o.deposit + ' ✓';
+    $('m-bal-label').textContent = o.balance_paid_at ? t().balPaid : t().bal;
+    $('m-bal').textContent = '$' + o.balance + (shipping ? ' + $' + shipping + ' ' + (lang === 'es' ? 'envío' : 'shipping') : (o.balance_paid_at ? '' : ' ' + t().shipIncl));
+    if (o.tracking_number) {
+      $('m-track-row').hidden = false;
+      $('m-track-label').textContent = t().track;
+      $('m-track').textContent = o.tracking_number;
+      $('m-track').href = o.tracking_url || '#';
+    } else $('m-track-row').hidden = true;
+
+    // approval card: latest approval_request message + not yet approved
+    var ap = null;
+    state.messages.forEach(function (m) { if (m.kind === 'approval_request') ap = m; });
+    if (ap && o.stage >= 3) {
+      $('approval-card').hidden = false;
+      $('ap-title').textContent = t().apTitle;
+      $('ap-photo').innerHTML = ap.photo_url ? '<img src="' + esc(ap.photo_url) + '" alt="finished piece">' : '';
+      $('ap-note').textContent = ap.body || '';
+      var ab = $('btn-approve');
+      if (o.approved_at) { ab.textContent = t().approved; ab.disabled = true; }
+      else { ab.textContent = t().approve; ab.disabled = false; }
+      var pb = $('btn-pay-balance');
+      if (o.balance_url && !o.balance_paid_at) {
+        pb.style.display = 'block';
+        pb.textContent = t().pay + ' · $' + (Number(o.balance) + (Number(o.shipping) || 0));
+        pb.href = o.balance_url;
+      } else pb.style.display = 'none';
+    } else $('approval-card').hidden = true;
+
+    $('thread').innerHTML = state.messages.map(function (m) {
+      if (m.kind === 'system' || m.sender_kind === 'system') {
+        return '<div class="bubble system">' + esc(m.body) + '</div>';
+      }
+      var mine = m.sender_kind === 'customer';
+      return '<div class="bubble' + (mine ? ' mine' : '') + '">' +
+        '<div class="who">' + esc(mine ? (lang === 'es' ? 'Tú' : 'You') : m.sender_name + ' · Lulu & Loop') + '</div>' +
+        (m.body ? esc(m.body) : '') +
+        (m.photo_url ? '<img src="' + esc(m.photo_url) + '" alt="">' : '') +
+        '<div class="when">' + esc((m.created_at || '').slice(0, 10)) + '</div></div>';
+    }).join('') || '<div class="muted">' + t().empty + '</div>';
+    $('thread').scrollTop = $('thread').scrollHeight;
+    $('back-list').hidden = !state.orders.length;
+    show('v-order');
+  }
+
+  function loadOrder(c, tk) {
+    return portal({ action: 'get', code: c, token: tk || '' }).then(function (res) {
+      state.order = res.order;
+      state.messages = res.messages || [];
+      renderOrder();
+    });
+  }
+
+  function renderList() {
+    $('order-list').innerHTML = state.orders.map(function (o, i) {
+      return '<div class="order-row" data-i="' + i + '">' +
+        '<img src="' + esc(o.img) + '" alt="" style="width:44px;height:44px;border-radius:10px;object-fit:cover">' +
+        '<div style="flex:1"><div class="item">' + esc(o.item) + '</div>' +
+        '<span class="code">' + esc(o.code) + '</span></div>' +
+        '<span class="chip ' + (o.stage >= 4 ? 'green' : 'pink') + '">' + esc(t().stages[o.stage]) + '</span></div>';
+    }).join('') || '<p class="muted">' + (lang === 'es' ? 'Aún no hay pedidos con este correo.' : 'No orders under this email yet.') + '</p>';
+    Array.prototype.forEach.call(document.querySelectorAll('.order-row'), function (row) {
+      row.addEventListener('click', function () {
+        var o = state.orders[Number(row.getAttribute('data-i'))];
+        loadOrder(o.code, '').catch(function (e) { alert(e.message); });
+      });
+    });
+    show('v-list');
+  }
+
+  /* ---------- auth ---------- */
+  function afterAuth(session) {
+    state.jwt = session.access_token;
+    state.email = session.user && session.user.email;
+    portal({ action: 'list' }).then(function (res) {
+      state.orders = res.orders || [];
+      if (code) {
+        loadOrder(code, token).catch(function () { renderList(); });
+      } else if (state.orders.length === 1) {
+        loadOrder(state.orders[0].code, '').catch(function () { renderList(); });
+      } else renderList();
+    }).catch(function (e) { $('a-err').textContent = e.message; show('v-access'); });
+  }
+
+  /* ---------- events ---------- */
+  function setLang(l) {
+    lang = l;
+    try { localStorage.setItem('luluandloop.lang', l); } catch (e) { /* ignore */ }
+    applyLabels();
+    if (!$('v-order').hidden && state.order) renderOrder();
+    else if (!$('v-list').hidden) renderList();
+  }
+  $('l-en').addEventListener('click', function () { setLang('en'); });
+  $('l-es').addEventListener('click', function () { setLang('es'); });
+  $('tab-signin').addEventListener('click', function () { state.mode = 'signin'; $('tab-signin').classList.add('on'); $('tab-signup').classList.remove('on'); applyLabels(); });
+  $('tab-signup').addEventListener('click', function () { state.mode = 'signup'; $('tab-signup').classList.add('on'); $('tab-signin').classList.remove('on'); applyLabels(); });
+
+  $('a-go').addEventListener('click', function () {
+    var email = $('a-email').value.trim();
+    var pass = $('a-pass').value;
+    if (!email || pass.length < 8) { $('a-err').textContent = t().needAll; return; }
+    if (!sb) { $('a-err').textContent = 'Accounts need the live backend.'; return; }
+    $('a-go').disabled = true;
+    var op = state.mode === 'signup'
+      ? sb.auth.signUp({ email: email, password: pass })
+      : sb.auth.signInWithPassword({ email: email, password: pass });
+    op.then(function (res) {
+      $('a-go').disabled = false;
+      if (res.error) { $('a-err').textContent = res.error.message; return; }
+      if (res.data.session) afterAuth(res.data.session);
+      else $('a-err').textContent = lang === 'es' ? 'Revisa tu correo para confirmar la cuenta.' : 'Check your email to confirm your account.';
+    });
+  });
+  $('btn-signout').addEventListener('click', function () {
+    if (sb) sb.auth.signOut();
+    state.jwt = null; state.orders = []; state.order = null; state.messages = []; state.email = null;
+    show('v-access');
+  });
+  $('back-list').addEventListener('click', function (e) { e.preventDefault(); renderList(); });
+
+  $('c-file').addEventListener('change', function () {
+    $('c-file-name').textContent = $('c-file').files[0] ? $('c-file').files[0].name : '';
+  });
+  $('c-send').addEventListener('click', function () {
+    var body = $('c-body').value.trim();
+    var file = $('c-file').files[0] || null;
+    if (!body && !file) return;
+    var fd = new FormData();
+    fd.append('code', state.order.code);
+    fd.append('token', token || '');
+    fd.append('body', body);
+    if (file) fd.append('file', file);
+    $('c-send').disabled = true;
+    var headers = state.jwt ? { Authorization: 'Bearer ' + state.jwt } : {};
+    fetch(fnUrl(), { method: 'POST', headers: headers, body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        $('c-send').disabled = false;
+        if (j.error) { $('c-err').textContent = j.error; return; }
+        $('c-err').textContent = '';
+        $('c-body').value = ''; $('c-file').value = ''; $('c-file-name').textContent = '';
+        state.messages = j.messages || state.messages;
+        renderOrder();
+      })
+      .catch(function () { $('c-send').disabled = false; $('c-err').textContent = 'Connection issue — try again.'; });
+  });
+  $('btn-approve').addEventListener('click', function () {
+    $('btn-approve').disabled = true;
+    portal({ action: 'approve', code: state.order.code, token: token || '' })
+      .then(function () { return loadOrder(state.order.code, token); })
+      .catch(function (e) { $('ap-err').textContent = e.message; $('btn-approve').disabled = false; });
+  });
+
+  /* ---------- boot ---------- */
+  applyLabels();
+  if (!cloud) {
+    show('v-access');
+    $('a-err').textContent = 'Demo mode — the portal activates with the live backend.';
+  } else if (code && token) {
+    loadOrder(code, token).catch(function (e) {
+      show('v-access');
+      $('a-err').textContent = e.message === 'request failed' ? t().wrongLink : e.message;
+    });
+  } else if (sb) {
+    sb.auth.getSession().then(function (res) {
+      if (res.data.session) afterAuth(res.data.session);
+      else show('v-access');
+    });
+  } else show('v-access');
+})();
+</script>
+</body>
+</html>

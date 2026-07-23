@@ -125,6 +125,10 @@
       <div class="drawer-chips" id="drawer-chips"></div>
       <div class="drawer-section">
         <div class="drawer-section-title">Payments</div>
+        <div class="quote-edit-row" id="quote-edit-row" hidden>
+          <span class="chip pinky">quote review</span>
+          <button class="btn-mini" id="btn-edit-quote">Edit final price</button>
+        </div>
         <div class="drawer-pay-row total"><span>Total quote</span><span class="val" id="drawer-price"></span></div>
         <div class="drawer-pay-row"><span>Deposit (40%)</span><span id="drawer-dep"></span></div>
         <div class="drawer-pay-row"><span>Balance (60%)</span><span id="drawer-bal"></span></div>
@@ -145,6 +149,21 @@
         <div class="ship-rates" id="ship-rates"></div>
         <div class="ship-actions" id="ship-actions"></div>
         <div class="ship-tracking" id="ship-tracking"></div>
+      </div>
+      <div class="drawer-section" id="drawer-approval-section" hidden>
+        <div class="drawer-section-title">Customer approval</div>
+        <div id="approval-status"></div>
+      </div>
+      <div class="drawer-section">
+        <div class="drawer-section-title">Messages with the customer</div>
+        <div class="thread" id="drawer-thread"></div>
+        <div class="composer">
+          <textarea id="msg-body" rows="2" placeholder="Write to the customer…"></textarea>
+          <div class="composer-row">
+            <label class="composer-attach">📎<input type="file" id="msg-file" accept="image/*,video/*" hidden><span id="msg-file-name"></span></label>
+            <button class="btn-primary btn-sm" id="btn-send-msg">Send</button>
+          </div>
+        </div>
       </div>
       <div class="drawer-section">
         <div class="drawer-section-title">Progress reports</div>

@@ -1,5 +1,7 @@
 User-agent: *
 Allow: /
 Disallow: /studio/
+Disallow: /orders/
+Disallow: /share/
 
 Sitemap: https://luluandloop.com/sitemap.xml
