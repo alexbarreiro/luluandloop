@@ -293,6 +293,9 @@
         saveOverride(order.code, { tracking_number: tracking, label_url: '', tracking_url: '' });
         return Promise.resolve({ tracking_number: tracking, label_url: '', tracking_url: '' });
       },
+      refreshLabel: function () {
+        return Promise.reject(new Error('No label PDFs in demo mode — configure Shippo to print real labels'));
+      },
       listPayouts: function () { return Promise.resolve(get('luluandloop.demo.payouts', [])); },
       recordPayout: function (artisanId, amount, orderCodes) {
         var ps = get('luluandloop.demo.payouts', []);
@@ -497,6 +500,9 @@
       },
       buyLabel: function (order, rateId) {
         return callFn('shippo', { action: 'buy', order_id: order.id, rate_id: rateId });
+      },
+      refreshLabel: function (order) {
+        return callFn('shippo', { action: 'refresh-label', order_id: order.id });
       },
       listPayouts: function () {
         return sb().from('payouts').select('*').order('created_at', { ascending: false }).then(function (r) {

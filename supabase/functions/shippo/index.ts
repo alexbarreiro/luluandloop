@@ -14,7 +14,7 @@ const SHIPPO_TOKEN = Deno.env.get("SHIPPO_API_TOKEN") ?? "";
 const SHIP_FROM_DEFAULT = {
   name: "Lulu & Loop", street1: "1 Beacon St", city: "Boston",
   state: "MA", zip: "02108", country: "US",
-  email: "hello@luluandloop.com",
+  email: "hello@luluandloop.com", phone: "6175550100", // USPS requires a phone
 };
 let SHIP_FROM: Record<string, string> | null = SHIP_FROM_DEFAULT;
 const rawShipFrom = Deno.env.get("SHIP_FROM");
@@ -174,13 +174,32 @@ async function handle(req: Request): Promise<Response> {
       await admin.from("orders").update({ tracking_number: null }).eq("id", order.id);
       return json({ error: (tx.messages ?? []).map((m: { text: string }) => m.text).join("; ") || "label purchase failed" }, 502);
     }
+    // The PDF can lag the SUCCESS status by a few seconds — poll briefly
+    let labelUrl = tx.label_url ?? null;
+    for (let i = 0; i < 3 && !labelUrl; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const fresh = await shippo(`/transactions/${tx.object_id}`);
+      labelUrl = fresh.label_url ?? null;
+    }
     const { error: upErr } = await admin.from("orders").update({
-      label_url: tx.label_url,
+      label_url: labelUrl,
       tracking_number: tx.tracking_number,
       tracking_url: tx.tracking_url_provider,
     }).eq("id", order.id);
     if (upErr) return json({ error: "label bought but could not be saved — check Shippo dashboard" }, 500);
-    return json({ label_url: tx.label_url, tracking_number: tx.tracking_number, tracking_url: tx.tracking_url_provider });
+    return json({ label_url: labelUrl, tracking_number: tx.tracking_number, tracking_url: tx.tracking_url_provider });
+  }
+
+  // Recover a label PDF that Shippo generated late (e.g. after billing was fixed)
+  if (action === "refresh-label") {
+    if (!isManager) return json({ error: "managers only" }, 403);
+    if (!order.tracking_number) return json({ error: "no label purchased yet" }, 409);
+    const list = await shippo("/transactions/?results=50");
+    const tx = (list.results ?? []).find(
+      (t: Record<string, unknown>) => t.tracking_number === order.tracking_number);
+    if (!tx?.label_url) return json({ error: "Label PDF not available yet — check Shippo billing/settings" }, 404);
+    await admin.from("orders").update({ label_url: tx.label_url }).eq("id", order.id);
+    return json({ label_url: tx.label_url });
   }
 
   return json({ error: "unknown action" }, 400);

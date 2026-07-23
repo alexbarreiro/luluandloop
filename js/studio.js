@@ -833,8 +833,11 @@
         (o.tracking_url ? ' · <a href="' + esc(o.tracking_url) + '" target="_blank" rel="noopener">track</a>' : '') +
         (o.label_url ? ' · <a href="' + esc(o.label_url) + '" target="_blank" rel="noopener"><b>print label ⎙</b></a>' : '') +
         '</div>';
+      if (!o.label_url && S.mode === 'cloud') {
+        actions = '<button class="btn-mini" id="btn-refresh-label">Fetch label PDF</button>';
+      }
       if (o.stage < 5) {
-        actions = '<button class="btn-primary btn-sm" id="btn-mark-shipped">Mark shipped 🎁 — customer gets tracking + photo request</button>';
+        actions += '<button class="btn-primary btn-sm" id="btn-mark-shipped">Mark shipped 🎁 — customer gets tracking + photo request</button>';
       }
     } else {
       actions = '<button class="btn-mini" id="btn-get-rates">' +
@@ -879,6 +882,19 @@
           toast('Label ready — print it from the drawer' + (res.tracking_number ? ' · ' + res.tracking_number : ''));
         });
       }).catch(function (err) { buyBtn.disabled = false; buyBtn.textContent = 'Buy label'; toast(err.message, true); });
+    });
+    var refreshBtn = $('btn-refresh-label');
+    if (refreshBtn) refreshBtn.addEventListener('click', function () {
+      refreshBtn.disabled = true;
+      refreshBtn.textContent = 'Fetching…';
+      S.refreshLabel(o).then(refresh).then(function () {
+        renderAll();
+        toast('Label PDF attached — print it from the drawer');
+      }).catch(function (err) {
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = 'Fetch label PDF';
+        toast(err.message, true);
+      });
     });
     var shipBtn = $('btn-mark-shipped');
     if (shipBtn) shipBtn.addEventListener('click', function () {
