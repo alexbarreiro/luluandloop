@@ -165,10 +165,12 @@ main { flex: 1; padding: 24px 18px 60px; min-width: 0; }
 .drawer-root[hidden] { display: none; }
 .drawer-scrim { position: absolute; inset: 0; background: rgba(44, 33, 26, .4); border: none; cursor: pointer; }
 .drawer {
-  position: absolute; right: 0; top: 0; bottom: 0; width: min(420px, 100vw);
+  position: absolute; right: 0; top: 0; bottom: 0; width: min(600px, 100vw);
   background: var(--card); box-shadow: -20px 0 50px rgba(44, 33, 26, .3);
-  padding: 26px; overflow-y: auto; box-sizing: border-box;
+  padding: 28px 30px; overflow-y: auto; box-sizing: border-box;
 }
+/* the order photo doesn't need to grow with the wider drawer */
+.drawer img.photo { max-height: 300px; }
 .drawer-top { display: flex; align-items: center; justify-content: space-between; }
 .drawer-code { font-size: 12px; font-weight: 800; letter-spacing: .1em; color: var(--pink); }
 .drawer-close {
