@@ -389,6 +389,14 @@ body.view-order #view-home { display: none; }
 .wizard[data-step="2"] .step2 { display: block; }
 .wizard[data-step="3"] .step3 { display: block; }
 
+.site-toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 16px); z-index: 120;
+  background: var(--dark); color: var(--cream); font-weight: 800; font-size: 14px;
+  padding: 14px 24px; border-radius: 999px; opacity: 0; transition: all .25s ease;
+  box-shadow: 0 14px 34px -12px rgba(32, 32, 42, .6); max-width: min(520px, 90vw); text-align: center;
+}
+.site-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .marquee-track { animation-duration: 90s; }

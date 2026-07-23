@@ -6,7 +6,9 @@ The customer describes a piece, gets an instant estimate, pays a **40% deposit**
 work-in-progress photos, then pays the **60% balance + shipping** when the finished piece
 is approved.
 
-Static site — no build step, no dependencies. Deployable on GitHub Pages as-is.
+Static front end on GitHub Pages + optional Supabase backend (auth, Postgres, storage,
+edge functions) and Stripe for real payments. Runs in **demo mode** (simulated checkout,
+browser-local studio data) until `js/config.js` is configured — see [SETUP.md](SETUP.md).
 
 ## Structure
 

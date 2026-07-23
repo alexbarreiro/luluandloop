@@ -239,7 +239,7 @@
         <div class="checkout-hint" id="checkout-hint"></div>
         <div class="checkout-foot">
           <button class="btn-back-step" id="btn-back-step">← <span data-i18n="backStep">Back</span></button>
-          <span class="stripe-note">Powered by <b>stripe</b> · <span data-i18n="s3Demo">demo — no real charge</span></span>
+          <span class="stripe-note">Powered by <b>stripe</b> · <span data-i18n="s3Demo" id="note-demo">demo — no real charge</span><span data-i18n="s3Live" id="note-live" hidden>you’ll finish on Stripe’s secure page</span></span>
         </div>
       </div>
     </div>
@@ -270,6 +270,8 @@
   </div>
 </div>
 
+<script src="/js/config.js"></script>
+<script src="/js/api.js"></script>
 <script src="/js/site.js"></script>
 </body>
 </html>

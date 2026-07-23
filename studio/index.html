@@ -13,17 +13,27 @@
 </head>
 <body>
 
-<!-- Passphrase gate -->
-<div class="gate" id="gate">
+<!-- Gate: cloud mode = email/password sign-in · demo mode = passphrase + role preview -->
+<div class="gate" id="gate" hidden>
   <div class="gate-card">
     <div class="gate-word display">Lulu <span class="amp">&amp;</span> Loop</div>
     <div class="gate-tag">Studio · Backend</div>
-    <p class="gate-note">This area is for the Lulu &amp; Loop team. Enter the studio passphrase to continue.</p>
+    <p class="gate-note" id="gate-note">This area is for the Lulu &amp; Loop team.</p>
     <form id="gate-form">
-      <input type="password" id="gate-pass" placeholder="Studio passphrase" autocomplete="current-password" autofocus>
-      <div class="gate-error" id="gate-error">That’s not it — try again.</div>
-      <button type="submit">Enter the studio</button>
+      <div id="gate-cloud-fields" hidden>
+        <input type="email" id="gate-email" placeholder="Email" autocomplete="username">
+        <input type="password" id="gate-pass-cloud" placeholder="Password" autocomplete="current-password" style="margin-top:10px">
+      </div>
+      <div id="gate-demo-fields" hidden>
+        <input type="password" id="gate-pass" placeholder="Studio passphrase" autocomplete="current-password">
+        <label class="gate-as">Preview as
+          <select id="gate-profile"></select>
+        </label>
+      </div>
+      <div class="gate-error" id="gate-error"></div>
+      <button type="submit" id="gate-submit">Enter the studio</button>
     </form>
+    <div class="gate-demo-note" id="gate-demo-note" hidden>Demo mode — no backend configured yet. Data lives in this browser only.</div>
   </div>
 </div>
 
@@ -33,20 +43,17 @@
       <div class="side-word display">Lulu &amp; Loop</div>
       <div class="side-tag">Studio · Backend</div>
     </div>
-    <div class="side-nav" id="side-nav">
-      <button data-view="board" class="active">⬚ Order board</button>
-      <button data-view="team">✿ Team &amp; workload</button>
-      <button data-view="pay">⟳ Payments</button>
-    </div>
+    <div class="side-nav" id="side-nav"></div>
     <div class="side-user">
       <div class="side-user-label">Logged in as</div>
       <div class="side-user-row">
-        <div class="side-avatar">L</div>
+        <div class="side-avatar" id="side-avatar">L</div>
         <div>
-          <div class="side-user-name">Lourdes “Lulu”</div>
-          <div class="side-user-role">Founder · Boston</div>
+          <div class="side-user-name" id="side-user-name"></div>
+          <div class="side-user-role" id="side-user-role"></div>
         </div>
       </div>
+      <button class="side-signout" id="btn-signout">Sign out</button>
     </div>
     <div class="side-view-site"><a href="/">← luluandloop.com</a></div>
   </aside>
@@ -55,12 +62,12 @@
     <div class="main-head">
       <h1 id="view-title">Order board</h1>
       <span class="date-chip" id="date-chip"></span>
-      <span class="head-note">demo data · payments via Stripe</span>
+      <span class="head-note" id="head-note"></span>
     </div>
 
     <div class="stats" id="stats"></div>
 
-    <div class="board view active" id="view-board"></div>
+    <div class="board view" id="view-board"></div>
     <div class="team-grid view" id="view-team"></div>
     <div class="view" id="view-pay">
       <div class="pay-table">
@@ -70,9 +77,28 @@
         <div id="pay-rows"></div>
       </div>
     </div>
+    <div class="view" id="view-staff">
+      <div class="view-toolbar">
+        <button class="btn-primary" id="btn-add-staff">＋ Add staff member</button>
+      </div>
+      <div class="staff-grid" id="staff-grid"></div>
+    </div>
+    <div class="view" id="view-tasks">
+      <div class="view-toolbar">
+        <button class="btn-primary" id="btn-add-task">＋ New task</button>
+        <span class="toolbar-note">Content engine: every commission produces its own content — reels, stories, reveals. Tag #HechoConLulu.</span>
+      </div>
+      <div class="task-list" id="task-list"></div>
+    </div>
+    <div class="view" id="view-mypieces">
+      <div class="piece-grid" id="piece-grid"></div>
+    </div>
+    <div class="view" id="view-mytasks">
+      <div class="task-list" id="mytask-list"></div>
+    </div>
   </main>
 
-  <!-- Order drawer -->
+  <!-- Order drawer (owner) -->
   <div class="drawer-root" id="drawer-root" hidden>
     <button class="drawer-scrim" id="drawer-scrim" aria-label="Close"></button>
     <div class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-item">
@@ -90,19 +116,50 @@
         <div class="drawer-pay-row total"><span>Total quote</span><span class="val" id="drawer-price"></span></div>
         <div class="drawer-pay-row"><span>Deposit (40%)</span><span id="drawer-dep"></span></div>
         <div class="drawer-pay-row"><span>Balance (60%)</span><span id="drawer-bal"></span></div>
+        <div class="balance-link-box" id="balance-link-box" hidden>
+          <div class="balance-link-label">Balance link (send to the customer):</div>
+          <div class="balance-link-url" id="balance-link-url"></div>
+          <button class="btn-mini" id="btn-copy-link">Copy link</button>
+        </div>
       </div>
       <div class="drawer-section">
-        <div class="drawer-section-title">Assigned artisan</div>
-        <select id="drawer-artisan"></select>
+        <div class="drawer-section-title" id="drawer-artisan-label">Assigned artisan</div>
+        <select id="drawer-artisan" aria-labelledby="drawer-artisan-label"></select>
+      </div>
+      <div class="drawer-section">
+        <div class="drawer-section-title">Progress reports</div>
+        <div class="report-list" id="drawer-reports"></div>
       </div>
       <div class="drawer-actions">
         <button class="btn-advance" id="drawer-advance"></button>
-        <button class="btn-balance-link" id="drawer-balance-link"></button>
+        <div class="shipping-row" id="shipping-row" hidden>
+          <label>Shipping (USD)
+            <input type="number" id="shipping-input" min="0" max="500" step="1" value="0">
+          </label>
+          <button class="btn-balance-link" id="drawer-balance-link"></button>
+        </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Generic modal (add staff / new task / report progress / submit evidence / review) -->
+  <div class="modal-root" id="modal-root" hidden>
+    <button class="modal-scrim" id="modal-scrim" aria-label="Close"></button>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-top">
+        <h2 id="modal-title"></h2>
+        <button class="drawer-close" id="modal-close" aria-label="Close">✕</button>
+      </div>
+      <div id="modal-body"></div>
     </div>
   </div>
 </div>
 
+<div id="toast-region" role="status" aria-live="assertive" aria-atomic="true"></div>
+
+<script src="/js/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/js/api.js"></script>
 <script src="/js/studio.js"></script>
 </body>
 </html>

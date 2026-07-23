@@ -88,7 +88,11 @@
     turnLabel: 'Estimated time', contBtn: 'Continue to deposit', contHint: 'Describe your idea to continue',
     estNote: 'You only pay the deposit today. Lulu confirms your final quote within 24h — if anything changes, you approve it first.',
     s3Title: 'Deposit checkout', s3Secure: 'Secure', s3Card: 'Card information', s3Demo: 'demo — no real charge',
+    s3Live: 'you’ll finish on Stripe’s secure page',
     payNow: 'Pay', processing: 'Processing…', payHint: 'Add your name and email to continue',
+    payError: 'Something went wrong starting the payment — please try again.',
+    balancePaidMsg: '¡Gracias! Balance received — your piece ships next. 🎁',
+    canceledMsg: 'Payment canceled — your design is safe below, try again when ready.',
     s4Title: '¡Gracias! Your piece is in the queue', s4Order: 'Order',
     balCard: 'Your piece is ready! Balance due',
     balCardSub: 'Pay the remaining 60% + shipping to release it. We never ship before you’ve seen finished photos.',
@@ -152,7 +156,11 @@
     turnLabel: 'Tiempo estimado', contBtn: 'Continuar al anticipo', contHint: 'Describe tu idea para continuar',
     estNote: 'Hoy solo pagas el anticipo. Lulu confirma tu cotización final en 24h — si algo cambia, tú lo apruebas primero.',
     s3Title: 'Pago del anticipo', s3Secure: 'Seguro', s3Card: 'Datos de tarjeta', s3Demo: 'demo — sin cargo real',
+    s3Live: 'terminarás en la página segura de Stripe',
     payNow: 'Pagar', processing: 'Procesando…', payHint: 'Agrega tu nombre y correo para continuar',
+    payError: 'Algo falló al iniciar el pago — inténtalo de nuevo.',
+    balancePaidMsg: '¡Gracias! Saldo recibido — tu pieza se envía pronto. 🎁',
+    canceledMsg: 'Pago cancelado — tu diseño sigue abajo, inténtalo cuando quieras.',
     s4Title: '¡Gracias! Tu pieza está en la fila', s4Order: 'Pedido',
     balCard: '¡Tu pieza está lista! Saldo pendiente',
     balCardSub: 'Paga el 60% restante + envío para liberarla. Nunca enviamos sin que veas fotos de la pieza terminada.',
@@ -202,6 +210,7 @@
     step: 1,
     paying: false,
     orderCode: null,
+    checkoutHint: null, // null | 'validate' | 'canceled' | 'error'
     form: { cat: 'dolls', size: 1, colors: '', desc: '', name: '', email: '', rush: false, refName: '' }
   };
   if (state.lang !== 'en' && state.lang !== 'es') state.lang = 'en';
@@ -369,6 +378,13 @@
 
   function renderCheckout() {
     var q = quote(), tt = t();
+    // With the real backend, payment details are collected on Stripe's hosted
+    // page — the inline demo card fields disappear.
+    var cloud = !!(window.LuluAPI && window.LuluAPI.cloudEnabled);
+    document.querySelector('.card-group').hidden = cloud;
+    document.querySelector('.card-split').hidden = cloud;
+    $('note-demo').hidden = cloud;
+    $('note-live').hidden = !cloud;
     $('pay-amount').textContent = fmt(q.deposit);
     $('pay-recap1').textContent = tt.depositLabel + ' · ' +
       (state.lang === 'en' ? q.cat.en : q.cat.es) + ' · ' +
@@ -376,7 +392,9 @@
     $('pay-recap2').textContent = tt.qTotal + ' ' + fmt(q.total) + ' · ' + tt.balanceLabel + ' ' + fmt(q.balance);
     $('pay-label').textContent = state.paying ? tt.processing : tt.payNow + ' ' + fmt(q.deposit);
     $('pay-spinner').hidden = !state.paying;
-    $('checkout-hint').textContent = tt.payHint;
+    var hintMsg = { validate: tt.payHint, canceled: tt.canceledMsg, error: tt.payError }[state.checkoutHint] || '';
+    $('checkout-hint').textContent = hintMsg;
+    $('checkout-hint').classList.toggle('show', !!hintMsg);
   }
 
   function renderTimeline() {
@@ -525,14 +543,42 @@
       if (!nameOk || !emailOk) {
         $('f-name').classList.toggle('invalid', !nameOk);
         $('f-email').classList.toggle('invalid', !emailOk);
-        $('checkout-hint').classList.add('show');
+        state.checkoutHint = 'validate';
+        renderCheckout();
         return;
       }
-      $('checkout-hint').classList.remove('show');
+      state.checkoutHint = null;
       state.paying = true;
       renderCheckout();
-      // Demo checkout — in production this becomes a Stripe Checkout Session
-      // for the deposit amount (see README).
+
+      if (window.LuluAPI && window.LuluAPI.cloudEnabled) {
+        // Real Stripe Checkout: the server derives all prices from the catalog —
+        // we only send stable identifiers plus the customer's own content.
+        var q = quote();
+        try {
+          sessionStorage.setItem('luluandloop.pendingForm',
+            JSON.stringify({ form: state.form, lang: state.lang }));
+        } catch (e) { /* ignore */ }
+        window.LuluAPI.createCheckout({
+          name: state.form.name.trim(),
+          email: state.form.email.trim(),
+          cat_id: q.cat.id,
+          size_idx: Math.min(state.form.size, q.cat.sizes.length - 1),
+          rush: state.form.rush,
+          desc: state.form.desc.trim(),
+          colors: state.form.colors.trim() || '—',
+          lang: state.lang
+        }).then(function (res) {
+          location.href = res.url; // Stripe-hosted checkout page
+        }).catch(function () {
+          state.paying = false;
+          state.checkoutHint = 'error';
+          renderCheckout();
+        });
+        return;
+      }
+
+      // Demo checkout (no backend configured) — simulated, clearly labeled on-screen
       setTimeout(function () {
         state.paying = false;
         state.orderCode = nextOrderCode();
@@ -560,6 +606,15 @@
     });
 
     window.addEventListener('hashchange', applyRoute);
+
+    // If the page is restored from the back/forward cache mid-checkout
+    // (user hit Back on Stripe's page), clear the stuck 'Processing…' state.
+    window.addEventListener('pageshow', function (e) {
+      if (e.persisted && state.paying) {
+        state.paying = false;
+        if (state.step === 2) renderCheckout();
+      }
+    });
   }
 
   function setLang(l) {
@@ -569,12 +624,58 @@
   }
 
   /* ---------- Init ---------- */
+  function siteToast(msg) {
+    var el = document.createElement('div');
+    el.className = 'site-toast';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(function () { el.classList.add('show'); }, 10);
+    setTimeout(function () { el.classList.remove('show'); setTimeout(function () { el.remove(); }, 400); }, 6000);
+  }
+
+  function restorePendingForm() {
+    try {
+      var pending = JSON.parse(sessionStorage.getItem('luluandloop.pendingForm') || 'null');
+      sessionStorage.removeItem('luluandloop.pendingForm');
+      if (pending && pending.form) {
+        state.form = Object.assign(state.form, pending.form);
+        if (pending.lang === 'en' || pending.lang === 'es') state.lang = pending.lang;
+        $('f-desc').value = state.form.desc || '';
+        $('f-colors').value = state.form.colors || '';
+        $('f-rush').checked = !!state.form.rush;
+        $('f-name').value = state.form.name || '';
+        $('f-email').value = state.form.email || '';
+      }
+    } catch (e) { /* ignore */ }
+  }
+
   var params = new URLSearchParams(location.search);
   if (params.get('lang') === 'es' || params.get('lang') === 'en') {
     state.lang = params.get('lang');
     lsSet('luluandloop.lang', state.lang);
   }
+
+  var backFromStripe = null;
+  if (params.get('paid') === 'deposit') backFromStripe = 'deposit';
+  else if (params.get('paid') === 'balance') backFromStripe = 'balance';
+  else if (params.get('canceled')) backFromStripe = 'canceled';
+
+  if (backFromStripe === 'deposit') {
+    restorePendingForm();
+    state.orderCode = params.get('code') || null;
+    state.step = 3;
+    history.replaceState(null, '', '/#order');
+  } else if (backFromStripe === 'canceled') {
+    restorePendingForm();
+    state.step = 2;
+    state.checkoutHint = 'canceled';
+    history.replaceState(null, '', '/#order');
+  } else if (backFromStripe === 'balance') {
+    history.replaceState(null, '', '/');
+  }
+
   bind();
   renderAll();
   document.body.classList.toggle('view-order', isOrderRoute());
+  if (backFromStripe === 'balance') siteToast(t().balancePaidMsg);
 })();
