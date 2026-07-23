@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lulu &amp; Loop — Custom crochet, made to order</title>
+<meta name="description" content="One-of-one dolls, heirloom blankets and little wonders — hand-stitched to your idea by Lulu and her artisans, and shipped anywhere in the world. Estudio bilingüe de crochet a pedido.">
+<link rel="canonical" href="https://luluandloop.com/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:title" content="Lulu &amp; Loop — Custom crochet, made to order">
+<meta property="og:description" content="If you can imagine it, we can crochet it. One-of-one pieces, stitched by hand and shipped worldwide.">
+<meta property="og:image" content="https://luluandloop.com/assets/witch-cat.jpg">
+<meta property="og:url" content="https://luluandloop.com/">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,400;0,6..12,600;0,6..12,700;0,6..12,800;0,6..12,900;1,6..12,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+
+<nav class="nav">
+  <button class="brand" id="brand" aria-label="Lulu &amp; Loop — home">
+    <span class="brand-word display">Lulu <span class="amp">&amp;</span> Loop</span>
+    <span class="brand-dot"></span>
+  </button>
+  <div class="nav-links home-only">
+    <a href="#gallery" data-i18n="navGallery">Gallery</a>
+    <a href="#how" data-i18n="navHow">How it works</a>
+    <a href="#pricing" data-i18n="navPricing">Pricing</a>
+    <a href="#story" data-i18n="navStory">Our story</a>
+  </div>
+  <div class="nav-right">
+    <div class="lang-toggle" role="group" aria-label="Language">
+      <button id="lang-en" class="on">EN</button>
+      <button id="lang-es">ES</button>
+    </div>
+    <button class="btn-pill home-only" data-start data-i18n="navCta">Start your piece</button>
+  </div>
+</nav>
+
+<!-- ============ HOME ============ -->
+<div id="view-home">
+  <section class="hero" aria-label="Intro">
+    <div>
+      <div class="eyebrow-chip" data-i18n="heroEyebrow">Custom crochet studio · Boston</div>
+      <h1 class="display"><span data-i18n="heroTitle">If you can imagine it, we can</span> <em data-i18n="heroTitleEm">crochet it.</em></h1>
+      <p class="hero-sub" data-i18n="heroSub">One-of-one dolls, heirloom blankets and little wonders — hand-stitched to your idea by Lulu and her artisans, and shipped anywhere in the world.</p>
+      <div class="hero-ctas">
+        <button class="btn-pill btn-hero" data-start data-i18n="heroCta">Start your piece</button>
+        <a href="#gallery" class="link-under" data-i18n="heroCta2">See the work</a>
+      </div>
+      <div class="trust-row">
+        <span>✓ <span data-i18n="trust1">40% deposit, rest when it ships</span></span>
+        <span>✓ <span data-i18n="trust2">Handmade — never machine-made</span></span>
+        <span>✓ <span data-i18n="trust3">Ships worldwide</span></span>
+      </div>
+    </div>
+    <div class="collage">
+      <img class="collage-tall" src="/assets/witch-cat.jpg" alt="Custom witch-cat amigurumi">
+      <img class="collage-square" src="/assets/bear-fairy.jpg" alt="Fairy bear amigurumi">
+      <div class="price-chip">
+        <div class="price-chip-label" data-i18n="fromChip">Pieces from</div>
+        <div class="price-chip-amount display">$18</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee-track" id="marquee-track"></div>
+  </div>
+
+  <section id="how" class="section">
+    <div class="eyebrow" data-i18n="howEyebrow">How it works</div>
+    <h2 class="h2 display" data-i18n="howTitle">From your idea to your doorstep</h2>
+    <div class="how-grid" id="how-grid"></div>
+  </section>
+
+  <section id="gallery" class="section">
+    <div class="gallery-head">
+      <div>
+        <div class="eyebrow" data-i18n="galEyebrow">The gallery</div>
+        <h2 class="h2 display" data-i18n="galTitle">Recently stitched</h2>
+      </div>
+      <div class="gallery-note" data-i18n="galNote">Every piece here began as someone’s photo, sketch or memory. Yours is next.</div>
+    </div>
+    <div class="gallery-grid" id="gallery-grid"></div>
+  </section>
+
+  <section id="pricing" class="section">
+    <div class="eyebrow" data-i18n="priceEyebrow">Categories &amp; pricing</div>
+    <h2 class="h2 display" data-i18n="priceTitle">What we make</h2>
+    <p class="pricing-sub" data-i18n="priceSub">Every piece is quoted from a base size price — final quote confirmed before you pay anything. Crochet can’t be machine-made: every stitch below is by hand.</p>
+    <div class="pricing-grid" id="pricing-grid"></div>
+    <div class="price-notes">
+      <span data-i18n="priceNote1">⚡ Rush (−40% time): +25%</span>
+      <span data-i18n="priceNote2">📦 Shipping quoted at checkout</span>
+      <span data-i18n="priceNote3">💳 40% deposit · balance when it ships</span>
+    </div>
+  </section>
+
+  <section id="story" class="section">
+    <div class="story-photo">
+      <img src="/assets/squirrel-red.jpg" alt="Coquette squirrel amigurumi">
+      <div class="story-chip display" data-i18n="storyChip">Est. in México · Grown in Boston</div>
+    </div>
+    <div>
+      <div class="eyebrow" data-i18n="storyEyebrow">Our story</div>
+      <h2 class="h2 display" data-i18n="storyTitle">Three countries, one thread</h2>
+      <p class="story-p" data-i18n="storyP1">Lourdes — Lulu to everyone who loves her — learned to crochet as a girl in Cuba, where a skein of yarn was worth more than gold and nothing ever went to waste.</p>
+      <p class="story-p" data-i18n="storyP2">In México she turned the craft into a company, teaching a small circle of artisans that a toy stitched by hand carries something a factory can never copy.</p>
+      <p class="story-p" data-i18n="storyP3">Today she works from Boston, near her daughter and grandkids — the first testers of every new design. Five artisans, two languages, one rule: made with love, or not at all.</p>
+      <div class="story-sign display">— Lourdes “Lulu”</div>
+      <div class="story-stats">
+        <span data-i18n="storyStat1">3 years in business</span>
+        <span data-i18n="storyStat2">5 artisans</span>
+        <span data-i18n="storyStat3">Cuba → CDMX → Boston</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section quotes" aria-label="Testimonials">
+    <div class="quotes-grid" id="quotes-grid"></div>
+  </section>
+
+  <section class="band">
+    <div class="band-inner">
+      <h2 class="display" data-i18n="bandTitle">Your imagination, our hands.</h2>
+      <button class="btn-band" data-start data-i18n="heroCta">Start your piece</button>
+    </div>
+  </section>
+
+  <footer>
+    <div>
+      <div class="foot-brand display">Lulu &amp; Loop</div>
+      <div class="foot-blurb" data-i18n="footBlurb">A bilingual, made-to-order crochet studio. One-of-one pieces, stitched by hand and shipped worldwide.</div>
+    </div>
+    <div class="foot-col">
+      <div class="foot-head" data-i18n="footContact">Say hello</div>
+      <a href="mailto:hello@luluandloop.com">hello@luluandloop.com</a>
+      <a href="https://www.instagram.com/lulu.gumitos" target="_blank" rel="noopener">@lulu.gumitos</a>
+      <span>Boston, MA</span>
+    </div>
+    <div class="foot-col">
+      <div class="foot-head" data-i18n="footPolicy">Good to know</div>
+      <span data-i18n="footP1">40% deposit · 60% when it ships</span>
+      <span data-i18n="footP2">Timelines: 1–8 weeks by size</span>
+      <span data-i18n="footP3">Worldwide shipping</span>
+    </div>
+  </footer>
+</div>
+
+<!-- ============ ORDER WIZARD ============ -->
+<div id="view-order">
+  <div class="order-wrap wizard" id="wizard" data-step="1">
+    <div class="order-top">
+      <button class="back-link" id="back-home">← <span data-i18n="back">Back to Lulu &amp; Loop</span></button>
+      <div class="stepper" id="stepper"></div>
+    </div>
+
+    <!-- Step 1 — Design it -->
+    <div class="step1">
+      <h2 class="display" data-i18n="s1Title">Design your piece</h2>
+      <p class="step1-sub" data-i18n="s1Sub">Three choices and a few words — that’s all it takes. Your price updates live on the right, and Lulu personally confirms every quote within 24h.</p>
+      <div class="step1-grid">
+        <div class="form-col">
+          <div>
+            <div class="field-label">1 · <span data-i18n="fCat">What are we making?</span></div>
+            <div class="cat-grid" id="cat-grid"></div>
+          </div>
+          <div>
+            <div class="field-label">2 · <span data-i18n="fSize">Pick a size</span></div>
+            <div class="size-pills" id="size-pills"></div>
+          </div>
+          <div>
+            <div class="field-label">3 · <span data-i18n="fDesc">Describe your idea</span></div>
+            <textarea id="f-desc" rows="4" data-i18n-ph="fDescPh"></textarea>
+            <div class="field-hint" data-i18n="fDescHint">A photo, a sketch or three sentences — anything works. You can send reference photos after checkout too.</div>
+          </div>
+          <div class="two-col">
+            <label class="small-field"><span><span data-i18n="fColors">Colors</span> <span class="opt" style="font-weight:600;color:var(--muted)" data-i18n="optional">(optional)</span></span>
+              <input id="f-colors" data-i18n-ph="fColorsPh">
+            </label>
+            <div class="small-field"><span><span data-i18n="fRef">Reference</span> <span class="opt" style="font-weight:600;color:var(--muted)" data-i18n="optional">(optional)</span></span>
+              <div class="dropzone" id="dropzone" role="button" tabindex="0">📎 <span id="dropzone-label" data-i18n="fRefPh">Drop a photo or sketch</span></div>
+              <input type="file" id="f-ref" accept="image/*,.pdf" hidden>
+            </div>
+          </div>
+          <label class="rush-row">
+            <input type="checkbox" id="f-rush">
+            <span class="rush-label"><span data-i18n="fRush">⚡ Rush my piece</span> <span class="sub" data-i18n="fRushSub">+25% · jumps the queue, −40% wait</span></span>
+          </label>
+        </div>
+
+        <div class="summary-card">
+          <div class="summary-eyebrow" data-i18n="estTitle">Your estimate</div>
+          <div class="summary-item" id="q-item"></div>
+          <div class="summary-row"><span class="lab" data-i18n="qBase">Base price</span><span class="val" id="q-base"></span></div>
+          <div class="summary-row rush" id="q-rush-row" hidden><span class="lab" data-i18n="qRush">Rush — jumps the queue</span><span class="val" id="q-rush"></span></div>
+          <div class="summary-total"><span data-i18n="qTotal">Total</span><span id="q-total"></span></div>
+          <div class="deposit-box">
+            <div class="main"><span id="q-dep-label"></span><span id="q-deposit"></span></div>
+            <div class="rest"><span id="q-bal-label"></span><span id="q-balance"></span></div>
+          </div>
+          <div class="summary-time"><span data-i18n="turnLabel">Estimated time</span><span class="val" id="q-turn"></span></div>
+          <button class="btn-continue" id="btn-continue"></button>
+          <div class="continue-hint" id="continue-hint" hidden>✎ <span data-i18n="contHint">Describe your idea to continue</span></div>
+          <div class="summary-note" data-i18n="estNote">You only pay the deposit today. Lulu confirms your final quote within 24h — if anything changes, you approve it first.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2 — Deposit checkout -->
+    <div class="step2">
+      <div class="checkout-card">
+        <div class="checkout-head">
+          <h2 class="display" data-i18n="s3Title">Deposit checkout</h2>
+          <span class="secure-tag">🔒 <span data-i18n="s3Secure">Secure</span></span>
+        </div>
+        <div class="checkout-amount display" id="pay-amount"></div>
+        <div class="checkout-line" id="pay-recap1"></div>
+        <div class="checkout-line last" id="pay-recap2"></div>
+        <div class="pay-fields">
+          <label class="pay-field"><span data-i18n="fName">Your name</span>
+            <input id="f-name" autocomplete="name" placeholder="Ana García">
+          </label>
+          <label class="pay-field"><span data-i18n="fEmail">Email</span>
+            <input id="f-email" type="email" autocomplete="email" placeholder="ana@email.com">
+          </label>
+        </div>
+        <label class="card-group"><span data-i18n="s3Card">Card information</span>
+          <input class="card-num" inputmode="numeric" placeholder="1234 1234 1234 1234">
+        </label>
+        <div class="card-split">
+          <input class="card-exp" inputmode="numeric" placeholder="MM / YY">
+          <input class="card-cvc" inputmode="numeric" placeholder="CVC">
+        </div>
+        <button class="btn-pay" id="btn-pay"><span class="spinner" id="pay-spinner" hidden></span><span id="pay-label"></span></button>
+        <div class="checkout-hint" id="checkout-hint"></div>
+        <div class="checkout-foot">
+          <button class="btn-back-step" id="btn-back-step">← <span data-i18n="backStep">Back</span></button>
+          <span class="stripe-note">Powered by <b>stripe</b> · <span data-i18n="s3Demo">demo — no real charge</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 — Confirmed -->
+    <div class="step3">
+      <div class="confirm-wrap">
+        <div class="confirm-head">
+          <div class="confirm-check" id="confirm-check">✓</div>
+          <h2 class="display" data-i18n="s4Title">¡Gracias! Your piece is in the queue</h2>
+          <div class="confirm-meta"><span data-i18n="s4Order">Order</span> <b id="order-code">LU-2607-0160</b> · <span id="conf-email"></span></div>
+        </div>
+        <div class="timeline-card">
+          <div id="timeline"></div>
+          <div class="balance-card" id="balance-card" hidden>
+            <div>
+              <div class="balance-card-title" data-i18n="balCard">Your piece is ready! Balance due</div>
+              <div class="balance-card-sub" data-i18n="balCardSub">Pay the remaining 60% + shipping to release it. We never ship before you’ve seen finished photos.</div>
+            </div>
+            <button class="btn-balance" id="btn-balance"></button>
+          </div>
+        </div>
+        <div class="confirm-actions">
+          <button class="btn-again" id="btn-again" data-i18n="again">Start another piece</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/site.js"></script>
+</body>
+</html>

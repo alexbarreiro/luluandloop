@@ -1,0 +1,6 @@
+# Design handoff bundle (reference prototypes + private business docs — not for the public repo)
+design_handoff_lulu_and_loop/
+
+# Local tooling
+.claude/
+.DS_Store

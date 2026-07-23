@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lulu &amp; Loop — Studio backend</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,400;0,6..12,600;0,6..12,700;0,6..12,800;0,6..12,900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/studio.css">
+</head>
+<body>
+
+<!-- Passphrase gate -->
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <div class="gate-word display">Lulu <span class="amp">&amp;</span> Loop</div>
+    <div class="gate-tag">Studio · Backend</div>
+    <p class="gate-note">This area is for the Lulu &amp; Loop team. Enter the studio passphrase to continue.</p>
+    <form id="gate-form">
+      <input type="password" id="gate-pass" placeholder="Studio passphrase" autocomplete="current-password" autofocus>
+      <div class="gate-error" id="gate-error">That’s not it — try again.</div>
+      <button type="submit">Enter the studio</button>
+    </form>
+  </div>
+</div>
+
+<div class="layout" id="app" hidden>
+  <aside>
+    <div class="side-brand">
+      <div class="side-word display">Lulu &amp; Loop</div>
+      <div class="side-tag">Studio · Backend</div>
+    </div>
+    <div class="side-nav" id="side-nav">
+      <button data-view="board" class="active">⬚ Order board</button>
+      <button data-view="team">✿ Team &amp; workload</button>
+      <button data-view="pay">⟳ Payments</button>
+    </div>
+    <div class="side-user">
+      <div class="side-user-label">Logged in as</div>
+      <div class="side-user-row">
+        <div class="side-avatar">L</div>
+        <div>
+          <div class="side-user-name">Lourdes “Lulu”</div>
+          <div class="side-user-role">Founder · Boston</div>
+        </div>
+      </div>
+    </div>
+    <div class="side-view-site"><a href="/">← luluandloop.com</a></div>
+  </aside>
+
+  <main>
+    <div class="main-head">
+      <h1 id="view-title">Order board</h1>
+      <span class="date-chip" id="date-chip"></span>
+      <span class="head-note">demo data · payments via Stripe</span>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="board view active" id="view-board"></div>
+    <div class="team-grid view" id="view-team"></div>
+    <div class="view" id="view-pay">
+      <div class="pay-table">
+        <div class="pay-head">
+          <span>Order</span><span>Customer</span><span>Type</span><span>Amount</span><span>Status</span><span>Stripe ref</span>
+        </div>
+        <div id="pay-rows"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Order drawer -->
+  <div class="drawer-root" id="drawer-root" hidden>
+    <button class="drawer-scrim" id="drawer-scrim" aria-label="Close"></button>
+    <div class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-item">
+      <div class="drawer-top">
+        <span class="drawer-code" id="drawer-code"></span>
+        <button class="drawer-close" id="drawer-close" aria-label="Close">✕</button>
+      </div>
+      <h2 id="drawer-item"></h2>
+      <div class="drawer-cust" id="drawer-cust"></div>
+      <img class="photo" id="drawer-img" src="" alt="">
+      <div class="drawer-desc" id="drawer-desc"></div>
+      <div class="drawer-chips" id="drawer-chips"></div>
+      <div class="drawer-section">
+        <div class="drawer-section-title">Payments</div>
+        <div class="drawer-pay-row total"><span>Total quote</span><span class="val" id="drawer-price"></span></div>
+        <div class="drawer-pay-row"><span>Deposit (40%)</span><span id="drawer-dep"></span></div>
+        <div class="drawer-pay-row"><span>Balance (60%)</span><span id="drawer-bal"></span></div>
+      </div>
+      <div class="drawer-section">
+        <div class="drawer-section-title">Assigned artisan</div>
+        <select id="drawer-artisan"></select>
+      </div>
+      <div class="drawer-actions">
+        <button class="btn-advance" id="drawer-advance"></button>
+        <button class="btn-balance-link" id="drawer-balance-link"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/studio.js"></script>
+</body>
+</html>
