@@ -20,9 +20,12 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// shipping_cost (our label cost) is intentionally absent — customers see only
+// their price; shipping_waived lets the portal celebrate the courtesy
 const ORDER_FIELDS = "id, code, item, size_label, desc_text, colors, rush, lang, price, deposit, " +
-  "balance, shipping, stage, img, created_at, approved_at, quote_note, balance_url, " +
-  "balance_paid_at, deposit_paid_at, tracking_number, tracking_url, customer, email, share_token";
+  "balance, shipping, shipping_waived, stage, img, created_at, approved_at, quote_note, balance_url, " +
+  "balance_paid_at, deposit_paid_at, deposit_ref, balance_ref, tracking_number, tracking_url, " +
+  "customer, email, share_token";
 
 async function jwtEmail(req: Request): Promise<string | null> {
   const jwt = (req.headers.get("Authorization") ?? "").replace("Bearer ", "");
@@ -69,7 +72,7 @@ Deno.serve(async (req) => {
   const email = await jwtEmail(req);
   const ct = req.headers.get("content-type") ?? "";
 
-  // ---- multipart: send a message (optionally with a photo) ----
+  // ---- multipart: send a message OR submit a review (optional photo) ----
   if (ct.includes("multipart/form-data")) {
     let form: FormData;
     try { form = await req.formData(); } catch { return json({ error: "bad form" }, 400); }
@@ -77,8 +80,36 @@ Deno.serve(async (req) => {
     const token = String(form.get("token") ?? "").slice(0, 40);
     const body = String(form.get("body") ?? "").trim().slice(0, 2000);
     const file = form.get("file");
+    const rating = form.get("rating") != null ? Number(form.get("rating")) : null;
     const order = await loadOrder(code, token, email);
     if (!order) return json({ error: "order not found — check your link" }, 403);
+
+    // Review submission (rating present)
+    if (rating != null) {
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) return json({ error: "rating must be 1-5" }, 400);
+      if (order.stage < 4) return json({ error: "reviews open once your piece has shipped" }, 409);
+      let photoPath: string | null = null;
+      if (file instanceof File && file.size > 0) {
+        if (file.size > 25 * 1024 * 1024) return json({ error: "photo too large (max 25MB)" }, 413);
+        const ALLOWED = /^(image\/(jpeg|png|gif|webp|heic|heif)|video\/(mp4|quicktime|webm))$/;
+        if (!ALLOWED.test(file.type)) return json({ error: "photos or short videos only" }, 415);
+        const safe = file.name.replace(/[^\w.-]+/g, "_").slice(0, 80);
+        photoPath = `reviews/${order.code}/${Date.now()}-${safe}`;
+        const { error } = await admin.storage.from("evidence")
+          .upload(photoPath, file.stream(), { contentType: file.type, duplex: "half" });
+        if (error) return json({ error: "photo upload failed — try again" }, 500);
+      }
+      const { error: revErr } = await admin.from("reviews").insert({
+        order_id: order.id, rating, body: body.slice(0, 1500), photo_path: photoPath,
+      });
+      if (revErr) {
+        if (photoPath) await admin.storage.from("evidence").remove([photoPath]);
+        return json({ error: String(revErr.code) === "23505"
+          ? "you already reviewed this piece — thank you!" : "could not save review" }, 409);
+      }
+      return json({ ok: true, review: { rating, body } });
+    }
+
     if (!body && !(file instanceof File)) return json({ error: "empty message" }, 400);
 
     let photoPath: string | null = null;
@@ -107,6 +138,26 @@ Deno.serve(async (req) => {
   const code = String(payload.code ?? "").slice(0, 20);
   const token = String(payload.token ?? "").slice(0, 40);
 
+  // ---- customer profile (account mode only) ----
+  if (action === "profile-get" || action === "profile-set") {
+    if (!email) return json({ error: "sign in first" }, 401);
+    const key = email.toLowerCase();
+    if (action === "profile-set") {
+      const p = payload.prefs as Record<string, unknown> | null;
+      const { error: prefErr } = await admin.from("customer_prefs").upsert({
+        email: key,
+        display_name: String(p?.display_name ?? "").trim().slice(0, 80),
+        lang: p?.lang === "es" ? "es" : "en",
+        marketing: p?.marketing !== false,
+        updated_at: new Date().toISOString(),
+      });
+      if (prefErr) return json({ error: "could not save profile — try again" }, 500);
+    }
+    const { data: prefs } = await admin.from("customer_prefs").select("display_name, lang, marketing")
+      .eq("email", key).maybeSingle();
+    return json({ prefs: prefs ?? { display_name: "", lang: "en", marketing: true }, email: key });
+  }
+
   if (action === "list") {
     if (!email) return json({ error: "sign in to list your orders" }, 401);
     // Escape LIKE metacharacters — the email must match literally (case-insensitive)
@@ -121,7 +172,9 @@ Deno.serve(async (req) => {
   if (!order) return json({ error: "order not found — check your link or sign in" }, 403);
 
   if (action === "get") {
-    return json({ order: publicOrder(order), messages: await messagesFor(order.id as string) });
+    const { data: review } = await admin.from("reviews")
+      .select("rating, body, created_at").eq("order_id", order.id).maybeSingle();
+    return json({ order: publicOrder(order), messages: await messagesFor(order.id as string), review });
   }
 
   if (action === "approve") {

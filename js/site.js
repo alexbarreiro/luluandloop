@@ -756,27 +756,18 @@
     lsSet('luluandloop.lang', state.lang);
   }
 
+  // Success now lands on /thanks/ — only the cancel path returns here
   var backFromStripe = null;
-  if (params.get('paid') === 'deposit') backFromStripe = 'deposit';
-  else if (params.get('paid') === 'balance') backFromStripe = 'balance';
-  else if (params.get('canceled')) backFromStripe = 'canceled';
+  if (params.get('canceled')) backFromStripe = 'canceled';
 
-  if (backFromStripe === 'deposit') {
-    restorePendingForm();
-    state.orderCode = params.get('code') || null;
-    state.step = 3;
-    history.replaceState(null, '', '/#order');
-  } else if (backFromStripe === 'canceled') {
+  if (backFromStripe === 'canceled') {
     restorePendingForm();
     state.step = 2;
     state.checkoutHint = 'canceled';
     history.replaceState(null, '', '/#order');
-  } else if (backFromStripe === 'balance') {
-    history.replaceState(null, '', '/');
   }
 
   bind();
   renderAll();
   document.body.classList.toggle('view-order', isOrderRoute());
-  if (backFromStripe === 'balance') siteToast(t().balancePaidMsg);
 })();

@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
     }],
     metadata: { kind: "deposit", order_id: order.id, code, rush: String(rush) },
     locale: lang === "es" ? "es" : "en",
-    success_url: `${SITE_URL}/?paid=deposit&code=${encodeURIComponent(code)}#order`,
+    success_url: `${SITE_URL}/thanks/?kind=deposit&code=${encodeURIComponent(code)}&lang=${lang === "es" ? "es" : "en"}`,
     cancel_url: `${SITE_URL}/?canceled=1#order`,
   });
 

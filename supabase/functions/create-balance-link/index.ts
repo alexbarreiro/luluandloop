@@ -56,16 +56,20 @@ Deno.serve(async (req) => {
 
   const { data: order, error: ordErr } = await admin
     .from("orders")
-    .select("id, code, item, email, balance, lang, balance_paid_at, shipping_rate")
+    .select("id, code, item, email, balance, lang, balance_paid_at, shipping_rate, shipping, shipping_waived, share_token")
     .eq("id", orderId).single();
   if (ordErr || !order) return json({ error: "order not found" }, 404);
   if (order.balance_paid_at) return json({ error: "balance already paid" }, 409);
 
-  // Default to the Shippo rate chosen in the studio when no manual amount given
+  // Shipping precedence: explicit override → customer price set in the studio
+  // (markup/waived) → the chosen rate's cost → 0
   const rateAmount = Number((order.shipping_rate as { amount?: string } | null)?.amount ?? NaN);
-  const effectiveShipping = body.shipping == null && Number.isFinite(rateAmount)
-    ? Math.round(rateAmount * 100) / 100
-    : shipping;
+  let effectiveShipping: number;
+  if (body.shipping != null) effectiveShipping = shipping;
+  else if (order.shipping_waived) effectiveShipping = 0;
+  else if (order.shipping != null) effectiveShipping = Number(order.shipping);
+  else if (Number.isFinite(rateAmount)) effectiveShipping = Math.round(rateAmount * 100) / 100;
+  else effectiveShipping = 0;
   const total = Number(order.balance) + effectiveShipping;
   const lang = order.lang === "es" ? "es" : "en";
   const label = lang === "es"
@@ -86,8 +90,8 @@ Deno.serve(async (req) => {
     }],
     metadata: { kind: "balance", order_id: order.id, code: order.code },
     locale: lang === "es" ? "es" : "en",
-    success_url: `${SITE_URL}/?paid=balance&code=${encodeURIComponent(order.code)}`,
-    cancel_url: `${SITE_URL}/`,
+    success_url: `${SITE_URL}/thanks/?kind=balance&code=${encodeURIComponent(order.code)}&lang=${lang}`,
+    cancel_url: `${SITE_URL}/orders/?code=${encodeURIComponent(order.code)}&t=${order.share_token}&lang=${lang}`,
   });
 
   await admin.from("orders").update({
@@ -95,6 +99,8 @@ Deno.serve(async (req) => {
     balance_session_id: session.id,
     balance_sent_at: new Date().toISOString(),
     shipping: effectiveShipping,
+    // the courtesy flag only survives if the customer truly pays $0 shipping
+    shipping_waived: order.shipping_waived && effectiveShipping === 0,
   }).eq("id", order.id);
 
   return json({ url: session.url });

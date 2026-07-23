@@ -103,14 +103,14 @@
   var NAVS = {
     owner: [['board', '⬚', 'Order board'], ['team', '✿', 'Team & workload'], ['pay', '⟳', 'Payments'],
             ['customers', '♡', 'Customers'], ['staff', '✚', 'Staff'], ['tasks', '✓', 'Tasks'],
-            ['payouts', '◈', 'Artisan payouts']],
+            ['financials', '∑', 'Financials'], ['payouts', '◈', 'Artisan payouts']],
     supervisor: [['board', '⬚', 'Order board'], ['team', '✿', 'Team & workload'], ['pay', '⟳', 'Payments'],
             ['customers', '♡', 'Customers'], ['tasks', '✓', 'Tasks']],
     artisan: [['mypieces', '⬚', 'My pieces'], ['mytasks', '✓', 'My tasks']]
   };
   var TITLES = { board: 'Order board', team: 'Team & workload', pay: 'Payments',
     staff: 'Staff', tasks: 'Tasks & content engine', mypieces: 'My pieces', mytasks: 'My tasks',
-    customers: 'Customers', payouts: 'Artisan payouts' };
+    customers: 'Customers', payouts: 'Artisan payouts', financials: 'Financials' };
 
   function renderNav() {
     var items = NAVS[state.me.role] || NAVS.artisan;
@@ -159,7 +159,7 @@
       var received = orders.filter(function (o) { return monthScoped ? inThisMonth(o.deposit_paid_at) : depPaid(o); })
         .reduce(function (a, o) { return a + dep(o); }, 0) +
         orders.filter(function (o) { return monthScoped ? inThisMonth(o.balance_paid_at) : balPaid(o); })
-        .reduce(function (a, o) { return a + bal(o); }, 0);
+        .reduce(function (a, o) { return a + bal(o) + (Number(o.shipping) || 0); }, 0);
       var month = new Date().toLocaleDateString('en-US', { month: 'long' });
       tiles = [
         { label: 'Open orders', value: String(openCount), sub: orders.filter(function (o) { return o.stage === 0; }).length + ' new this week' },
@@ -267,7 +267,10 @@
           ref: o.deposit_ref || (demo ? 'pi_3Q' + o.code.slice(-4) + 'dLx' : '—') });
       }
       if (balPaid(o)) {
-        rows.push({ item: o.item, customer: o.customer, type: 'Balance 60%', amount: fmt(bal(o)),
+        var shipAmt = Number(o.shipping) || 0;
+        rows.push({ item: o.item, customer: o.customer,
+          type: shipAmt > 0 ? 'Balance 60% + shipping' : 'Balance 60%',
+          amount: fmt(bal(o) + shipAmt),
           status: 'succeeded', cls: 'green',
           ref: o.balance_ref || (demo ? 'pi_3Q' + o.code.slice(-4) + 'bFn' : '—') });
       } else if (o.stage === 3) {
@@ -676,6 +679,106 @@
     });
   }
 
+  /* ---------- Financials (owner) ----------
+     Revenue is booked by when money actually arrived (paid stamps); shipping
+     margin = collected − label cost (waived shipping shows as a loss);
+     artisan share (40%) accrues when their piece ships. */
+  function renderFinancials() {
+    function monthKey(iso) {
+      var d = new Date(iso);
+      return iso && !isNaN(d)
+        ? d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2)
+        : 'all-time';
+    }
+    function monthLabel(k) {
+      if (k === 'all-time') return 'Undated';
+      return new Date(k + '-15').toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    }
+    var months = {};
+    function bucket(k) {
+      return months[k] || (months[k] = { orders: 0, deposits: 0, balances: 0,
+        shipCollected: 0, shipCost: 0, artisanShare: 0 });
+    }
+    var artisanIds = {};
+    state.profiles.forEach(function (p) { if (p.role === 'artisan') artisanIds[p.id] = true; });
+
+    state.orders.forEach(function (o) {
+      if (o.deposit_paid_at) {
+        var mk = monthKey(o.deposit_paid_at);
+        bucket(mk).deposits += dep(o);
+        bucket(mk).orders += 1;
+      }
+      if (o.balance_paid_at) {
+        var mb = monthKey(o.balance_paid_at);
+        bucket(mb).balances += bal(o);
+        bucket(mb).shipCollected += Number(o.shipping) || 0;
+        if (o.shipping_cost != null) bucket(mb).shipCost += Number(o.shipping_cost);
+      }
+      if (o.stage >= 4 && o.artisan_id && artisanIds[o.artisan_id]) {
+        bucket(monthKey(o.shipped_at)).artisanShare += Number(o.price) * 0.4;
+      }
+    });
+
+    var keys = Object.keys(months).sort().reverse();
+    var $2 = function (n) { return '$' + (Math.round(n * 100) / 100).toFixed(2); };
+    var tot = { orders: 0, deposits: 0, balances: 0, shipCollected: 0, shipCost: 0, artisanShare: 0 };
+    var rows = keys.map(function (k) {
+      var m = months[k];
+      Object.keys(tot).forEach(function (f) { tot[f] += m[f]; });
+      var margin = m.shipCollected - m.shipCost;
+      var net = m.deposits + m.balances + margin - m.artisanShare;
+      return '<tr><td>' + esc(monthLabel(k)) + '</td><td>' + m.orders + '</td>' +
+        '<td>' + $2(m.deposits) + '</td><td>' + $2(m.balances) + '</td>' +
+        '<td>' + $2(m.shipCollected) + '</td><td>' + $2(m.shipCost) + '</td>' +
+        '<td class="' + (margin < 0 ? 'fin-neg' : 'fin-pos') + '">' + $2(margin) + '</td>' +
+        '<td>' + $2(m.artisanShare) + '</td>' +
+        '<td class="' + (net < 0 ? 'fin-neg' : '') + '"><b>' + $2(net) + '</b></td></tr>';
+    }).join('');
+    var totMargin = tot.shipCollected - tot.shipCost;
+    var totNet = tot.deposits + tot.balances + totMargin - tot.artisanShare;
+    $('fin-monthly').innerHTML =
+      '<tr><th>Month</th><th>New paid orders</th><th>Deposits</th><th>Balances</th>' +
+      '<th>Shipping collected</th><th>Shipping cost</th><th>Shipping margin</th>' +
+      '<th>Artisan share</th><th>Net</th></tr>' +
+      (rows || '<tr><td colspan="9">No paid orders yet.</td></tr>') +
+      (rows ? '<tr class="total"><td>Total</td><td>' + tot.orders + '</td><td>' + $2(tot.deposits) + '</td>' +
+        '<td>' + $2(tot.balances) + '</td><td>' + $2(tot.shipCollected) + '</td><td>' + $2(tot.shipCost) + '</td>' +
+        '<td class="' + (totMargin < 0 ? 'fin-neg' : 'fin-pos') + '">' + $2(totMargin) + '</td>' +
+        '<td>' + $2(tot.artisanShare) + '</td><td class="' + (totNet < 0 ? 'fin-neg' : '') + '"><b>' + $2(totNet) + '</b></td></tr>' : '');
+
+    // summary tiles
+    var waivedLoss = state.orders.filter(function (o) { return o.shipping_waived && o.shipping_cost != null && o.balance_paid_at; })
+      .reduce(function (s, o) { return s + Number(o.shipping_cost); }, 0);
+    $('fin-tiles').innerHTML = [
+      { label: 'Collected (all time)', value: $2(tot.deposits + tot.balances + tot.shipCollected), sub: 'deposits + balances + shipping' },
+      { label: 'Shipping margin', value: $2(totMargin), sub: totMargin < 0 ? 'includes courtesy waivers' : 'markup earned' },
+      { label: 'Courtesy shipping given', value: $2(waivedLoss), sub: 'waived as a gift' },
+      { label: 'Net after artisan share', value: $2(totNet), sub: '40% share on shipped pieces' }
+    ].map(function (s) {
+      return '<div class="stat-tile"><div class="stat-label">' + esc(s.label) + '</div>' +
+        '<div class="stat-value display">' + esc(s.value) + '</div>' +
+        '<div class="stat-sub">' + esc(s.sub) + '</div></div>';
+    }).join('');
+
+    // sales by region (from shipping addresses; falls back to the order's origin note)
+    var regions = {};
+    state.orders.forEach(function (o) {
+      if (!o.deposit_paid_at) return;
+      var a = o.shipping_address;
+      var key = a ? ((a.country || '?') + (a.country === 'US' && a.state ? ' · ' + a.state : ''))
+                  : (o.where_from || 'Unknown');
+      var r = regions[key] || (regions[key] = { orders: 0, collected: 0 });
+      r.orders += 1;
+      r.collected += dep(o) + (o.balance_paid_at ? bal(o) + (Number(o.shipping) || 0) : 0);
+    });
+    var regionRows = Object.keys(regions).sort(function (a, b) { return regions[b].collected - regions[a].collected; })
+      .map(function (k) {
+        return '<tr><td>' + esc(k) + '</td><td>' + regions[k].orders + '</td><td>' + $2(regions[k].collected) + '</td></tr>';
+      }).join('');
+    $('fin-region').innerHTML = '<tr><th>Region</th><th>Paid orders</th><th>Collected</th></tr>' +
+      (regionRows || '<tr><td colspan="3">No data yet.</td></tr>');
+  }
+
   /* ---------- My pieces (artisan) ---------- */
   function renderMyPieces() {
     var mine = state.orders.filter(function (o) { return o.artisan_id === state.me.id && o.stage >= 1 && o.stage < 4; });
@@ -765,9 +868,19 @@
     return state.orders.find(function (o) { return o.code === state.selected; });
   }
 
+  function drawerPinned() {
+    try { return localStorage.getItem('luluandloop.studio.pinned') === '1'; } catch (e) { return false; }
+  }
+  function applyDrawerMode() {
+    var pinned = drawerPinned();
+    $('drawer-root').classList.toggle('centered', !pinned);
+    $('drawer-pin').textContent = pinned ? '⛶' : '⇥';
+    $('drawer-pin').title = pinned ? 'Expand to centered view' : 'Pin to the right';
+  }
   function openDrawer(code) {
     lastFocus = document.activeElement;
     state.selected = code;
+    applyDrawerMode();
     renderDrawer();
     $('drawer-root').hidden = false;
     $('drawer-close').focus();
@@ -838,8 +951,11 @@
     if (o.stage === 3 && !o.balance_sent_at && !balPaid(o)) {
       row.hidden = false;
       var rate = o.shipping_rate;
+      var shipLabel = o.shipping_waived ? '$0 shipping (waived 💗)'
+        : (o.shipping != null ? '$' + Number(o.shipping).toFixed(2) + ' shipping'
+          : (rate ? '$' + Number(rate.amount).toFixed(2) + ' shipping' : 'shipping'));
       $('drawer-balance-link').textContent = rate
-        ? 'Send balance link · ' + fmt(bal(o)) + ' + $' + Number(rate.amount).toFixed(2) + ' shipping'
+        ? 'Send balance link · ' + fmt(bal(o)) + ' + ' + shipLabel
         : 'Send Stripe balance link · ' + fmt(bal(o)) + ' + shipping';
       // manual shipping input only needed when no rate was chosen
       $('shipping-row').querySelector('label').hidden = !!rate;
@@ -989,10 +1105,36 @@
         (S.mode === 'demo' ? '; demo orders don’t have one — rates below are samples' : '') + ').</span>';
 
     var chosen = o.shipping_rate;
-    $('ship-rate-chosen').innerHTML = chosen
-      ? '<span class="chip green">✓ ' + esc(chosen.provider + ' ' + (chosen.service || '')) + ' — $' +
-        esc(Number(chosen.amount).toFixed(2)) + (chosen.days ? ' · ~' + esc(chosen.days) + 'd' : '') + '</span>'
-      : '';
+    var cost = o.shipping_cost != null ? Number(o.shipping_cost) : (chosen ? Number(chosen.amount) : null);
+    var custPrice = o.shipping_waived ? 0 : (o.shipping != null ? Number(o.shipping) : cost);
+    var chosenHtml = '';
+    if (chosen) {
+      chosenHtml = '<span class="chip green">✓ ' + esc(chosen.provider + ' ' + (chosen.service || '')) +
+        ' — cost $' + esc(Number(cost).toFixed(2)) + (chosen.days ? ' · ~' + esc(chosen.days) + 'd' : '') + '</span>';
+      if (custPrice != null) {
+        var margin = Math.round((custPrice - cost) * 100) / 100;
+        chosenHtml += ' <span class="chip soft">customer pays ' +
+          (o.shipping_waived ? '$0 · waived 💗' : '$' + Number(custPrice).toFixed(2)) + '</span>' +
+          (margin !== 0
+            ? ' <span class="chip margin-chip ' + (margin > 0 ? 'gain' : 'loss') + '">' +
+              (margin > 0 ? '+' : '−') + '$' + Math.abs(margin).toFixed(2) + (margin > 0 ? ' markup' : ' our cost') + '</span>'
+            : '');
+      }
+    }
+    $('ship-rate-chosen').innerHTML = chosenHtml;
+
+    // Customer price controls (markup / courtesy waive) — until the link is sent
+    var priceControls = '';
+    if (chosen && !o.balance_sent_at && !balPaid(o) && !o.tracking_number) {
+      priceControls =
+        '<div class="ship-price-row">' +
+        '<label>Customer pays (USD)<input type="number" id="ship-price-input" min="0" max="500" step="0.01" value="' +
+        (o.shipping_waived ? '0' : Number(custPrice != null ? custPrice : cost).toFixed(2)) + '"></label>' +
+        '<button class="btn-mini" id="btn-save-shipping">Save price</button>' +
+        '<button class="btn-mini" id="btn-waive-shipping">' + (o.shipping_waived ? 'Waived ✓' : 'Waive — courtesy 💗') + '</button>' +
+        '</div>' +
+        '<div class="ship-cost-note">Mark it up if you want — or waive it as a gift. Waived cost shows as a loss in Financials.</div>';
+    }
 
     var ratesHtml = '';
     if (state.shipRates && state.shipRates.orderCode === o.code) {
@@ -1030,8 +1172,27 @@
         actions += '<span class="field-note">Label unlocks once the balance is paid.</span>';
       }
     }
-    $('ship-actions').innerHTML = actions;
+    $('ship-actions').innerHTML = priceControls + actions;
     $('ship-tracking').innerHTML = trackingHtml;
+
+    var saveShipBtn = $('btn-save-shipping');
+    if (saveShipBtn) saveShipBtn.addEventListener('click', function () {
+      var price = parseFloat($('ship-price-input').value);
+      if (!(price >= 0)) { toast('Enter a valid shipping price', true); return; }
+      saveShipBtn.disabled = true;
+      S.setShipping(o, price, false).then(refresh).then(function () {
+        renderAll(); renderDrawer();
+        toast('Customer shipping price saved: $' + price.toFixed(2));
+      }).catch(function (err) { saveShipBtn.disabled = false; toast(err.message, true); });
+    });
+    var waiveBtn = $('btn-waive-shipping');
+    if (waiveBtn) waiveBtn.addEventListener('click', function () {
+      waiveBtn.disabled = true;
+      S.setShipping(o, 0, true).then(refresh).then(function () {
+        renderAll(); renderDrawer();
+        toast('Shipping waived as a courtesy — cost tracked in Financials 💗');
+      }).catch(function (err) { waiveBtn.disabled = false; toast(err.message, true); });
+    });
 
     var getBtn = $('btn-get-rates');
     if (getBtn) getBtn.addEventListener('click', function () {
@@ -1039,8 +1200,12 @@
       getBtn.textContent = 'Getting rates…';
       S.getShippingRates(o).then(function (res) {
         state.shipRates = { orderCode: o.code, rates: res.rates || [] };
+        if (state.selected !== o.code) return; // drawer moved on
         renderShipping(o);
-      }).catch(function (err) { toast(err.message, true); renderShipping(o); });
+      }).catch(function (err) {
+        toast(err.message, true);
+        if (state.selected === o.code) renderShipping(o);
+      });
     });
     Array.prototype.forEach.call(document.querySelectorAll('.rate-option'), function (b) {
       b.addEventListener('click', function () {
@@ -1131,10 +1296,10 @@
   /* ---------- Views ---------- */
   var VIEW_RENDER = { board: renderBoard, team: renderTeam, pay: renderPayments,
     staff: renderStaff, tasks: renderTasks, mypieces: renderMyPieces, mytasks: renderMyTasks,
-    customers: renderCustomers, payouts: renderPayouts };
+    customers: renderCustomers, payouts: renderPayouts, financials: renderFinancials };
 
   function renderCurrentView() {
-    ['board', 'team', 'pay', 'staff', 'tasks', 'mypieces', 'mytasks', 'customers', 'payouts'].forEach(function (v) {
+    ['board', 'team', 'pay', 'staff', 'tasks', 'mypieces', 'mytasks', 'customers', 'payouts', 'financials'].forEach(function (v) {
       var el = $('view-' + v);
       if (el) el.classList.toggle('active', state.view === v);
     });
@@ -1251,6 +1416,10 @@
   });
   $('drawer-scrim').addEventListener('click', closeDrawer);
   $('drawer-close').addEventListener('click', closeDrawer);
+  $('drawer-pin').addEventListener('click', function () {
+    try { localStorage.setItem('luluandloop.studio.pinned', drawerPinned() ? '0' : '1'); } catch (e) { /* ignore */ }
+    applyDrawerMode();
+  });
   $('modal-scrim').addEventListener('click', closeModal);
   $('modal-close').addEventListener('click', closeModal);
   document.addEventListener('keydown', function (e) {

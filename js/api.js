@@ -123,7 +123,8 @@
           if (x.balanceSent) o.balance_sent_at = o.balance_sent_at || 'demo';
           if (x.balance_sent_at) o.balance_sent_at = x.balance_sent_at;
           ['shipping_rate', 'tracking_number', 'label_url', 'tracking_url',
-            'price', 'deposit', 'balance', 'approved_at'].forEach(function (k2) {
+            'price', 'deposit', 'balance', 'approved_at',
+            'shipping', 'shipping_cost', 'shipping_waived'].forEach(function (k2) {
             if (k2 in x) o[k2] = x[k2];
           });
         }
@@ -299,8 +300,19 @@
       },
       getShippingRates: function () { return Promise.resolve({ rates: DEMO_RATES }); },
       chooseRate: function (order, rate) {
-        saveOverride(order.code, { shipping_rate: rate });
+        var cost = Math.round(Number(rate.amount) * 100) / 100;
+        var locked = !!(order.balance_sent_at || order.balance_paid_at);
+        var patch = { shipping_rate: rate, shipping_cost: cost };
+        if (!locked) { patch.shipping = cost; patch.shipping_waived = false; }
+        saveOverride(order.code, patch);
         return Promise.resolve({ ok: true, rate: rate });
+      },
+      setShipping: function (order, price, waived) {
+        if (order.balance_sent_at || order.balance_paid_at) {
+          return Promise.reject(new Error('shipping price is locked — the balance link was already sent'));
+        }
+        saveOverride(order.code, { shipping: waived ? 0 : Math.round(price * 100) / 100, shipping_waived: !!waived });
+        return Promise.resolve({ ok: true });
       },
       buyLabel: function (order) {
         var tracking = '9400 demo ' + order.code.slice(-4);
@@ -544,6 +556,9 @@
       },
       chooseRate: function (order, rate) {
         return callFn('shippo', { action: 'choose', order_id: order.id, rate: rate });
+      },
+      setShipping: function (order, price, waived) {
+        return callFn('shippo', { action: 'set-shipping', order_id: order.id, price: price, waived: !!waived });
       },
       buyLabel: function (order, rateId) {
         return callFn('shippo', { action: 'buy', order_id: order.id, rate_id: rateId });

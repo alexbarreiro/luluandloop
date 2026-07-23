@@ -102,6 +102,13 @@
       </div>
       <div class="customer-list" id="customer-list"></div>
     </div>
+    <div class="view" id="view-financials">
+      <div class="fin-tiles" id="fin-tiles"></div>
+      <p class="fin-section-title">Month by month</p>
+      <div class="fin-table"><table id="fin-monthly"></table></div>
+      <p class="fin-section-title">Sales by region</p>
+      <div class="fin-table"><table id="fin-region"></table></div>
+    </div>
     <div class="view" id="view-payouts">
       <div class="toolbar-note" style="margin-bottom:16px">Artisan pay: 40% of each shipped piece. The founder keeps full profit and isn’t listed here.</div>
       <div class="payout-grid" id="payout-grid"></div>
@@ -116,7 +123,10 @@
     <div class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-item">
       <div class="drawer-top">
         <span class="drawer-code" id="drawer-code"></span>
-        <button class="drawer-close" id="drawer-close" aria-label="Close">✕</button>
+        <span style="display:flex;gap:8px">
+          <button class="drawer-pin" id="drawer-pin" title="Pin to the right / center" aria-label="Toggle pinned layout">⇥</button>
+          <button class="drawer-close" id="drawer-close" aria-label="Close">✕</button>
+        </span>
       </div>
       <h2 id="drawer-item"></h2>
       <div class="drawer-cust" id="drawer-cust"></div>

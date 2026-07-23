@@ -96,11 +96,13 @@ async function handle(req: Request): Promise<Response> {
   if (!orderId) return json({ error: "order_id required" }, 400);
 
   const { data: order } = await admin.from("orders")
-    .select("id, code, item, size_label, email, shipping_name, shipping_address, shipping_rate, tracking_number")
+    .select("id, code, item, size_label, email, shipping_name, shipping_address, shipping_rate, tracking_number, balance_paid_at, balance_sent_at, shipping, shipping_waived")
     .eq("id", orderId).single();
   if (!order) return json({ error: "order not found" }, 404);
+  // Once the balance link exists the customer's shipping price is locked
+  const priceLocked = !!(order.balance_sent_at || order.balance_paid_at);
 
-  // 'choose' stores the picked rate (no Shippo call, manager-only)
+  // 'choose' stores the picked rate; our cost + a default customer price
   if (action === "choose") {
     if (!isManager) return json({ error: "managers only" }, 403);
     const r = body.rate as Record<string, unknown> | null;
@@ -110,9 +112,32 @@ async function handle(req: Request): Promise<Response> {
       service: String(r.service ?? "").slice(0, 80), amount: String(Number(r.amount)),
       currency: String(r.currency ?? "USD").slice(0, 4), days: Number(r.days) || null,
     };
-    const { error } = await admin.from("orders").update({ shipping_rate: clean }).eq("id", order.id);
+    const cost = Math.round(Number(r.amount) * 100) / 100;
+    const patch: Record<string, unknown> = { shipping_rate: clean, shipping_cost: cost };
+    if (!priceLocked) {
+      patch.shipping = cost;   // default customer price = our cost (markup via set-shipping)
+      patch.shipping_waived = false;
+    }
+    const { error } = await admin.from("orders").update(patch).eq("id", order.id);
     if (error) return json({ error: "could not save rate" }, 500);
     return json({ ok: true, rate: clean });
+  }
+
+  // 'set-shipping' — manager sets the customer-facing price (markup or waive)
+  if (action === "set-shipping") {
+    if (!isManager) return json({ error: "managers only" }, 403);
+    if (priceLocked) return json({ error: "shipping price is locked — the balance link was already sent" }, 409);
+    const waived = Boolean(body.waived);
+    const price = waived ? 0 : Number(body.price);
+    if (!waived && (!Number.isFinite(price) || price < 0 || price > 500)) {
+      return json({ error: "bad shipping price" }, 400);
+    }
+    const { error } = await admin.from("orders").update({
+      shipping: Math.round(price * 100) / 100,
+      shipping_waived: waived,
+    }).eq("id", order.id);
+    if (error) return json({ error: "could not save shipping price" }, 500);
+    return json({ ok: true, shipping: price, waived });
   }
   if (!SHIPPO_TOKEN) return json({ error: "Shipping is not configured yet (missing Shippo token)" }, 501);
   if (!SHIP_FROM) return json({ error: "SHIP_FROM secret is not valid JSON — re-set it as a JSON object" }, 500);
@@ -156,6 +181,11 @@ async function handle(req: Request): Promise<Response> {
 
   if (action === "buy") {
     if (!isManager) return json({ error: "managers only" }, 403);
+    // The shipping fee (part of the balance) must be paid before we print,
+    // even when shipping was waived — the balance itself is still due
+    if (!order.balance_paid_at) {
+      return json({ error: "The balance (incl. shipping fee) must be paid before printing the label" }, 409);
+    }
     const rateId = String(body.rate_id ?? "");
     if (!rateId) return json({ error: "rate_id required" }, 400);
     // Atomically claim the purchase so concurrent clicks can't buy two labels

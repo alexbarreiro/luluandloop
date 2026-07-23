@@ -202,6 +202,31 @@ Deno.serve(async (req) => {
     return Response.json({ ok: true, res });
   }
 
+  if (kind === "review_request") {
+    // The daily cron retries until this stamp exists — set it only on real delivery
+    const markSent = async (res: { status?: number }) => {
+      if (res.status && res.status < 300) {
+        await admin.from("orders").update({ review_request_sent_at: new Date().toISOString() }).eq("id", oid);
+      }
+    };
+    const res = await send(to,
+      es ? `¿Cómo llegó tu pieza? 💗 · ${order.code}` : `How did your piece arrive? 💗 · ${order.code}`,
+      shell(es
+        ? `<p style="font-size:15px">¡Hola ${first}!</p>
+           <p style="font-size:15px;line-height:1.6">Tu <b>${esc(order.item)}</b> ya debería estar contigo — esperamos que haya sido amor a primera puntada. 🧶</p>
+           <p style="font-size:15px;line-height:1.6">¿Nos regalas una reseña? Dos frases y unas estrellas nos ayudan muchísimo (y a Lulu le encanta leerlas todas).</p>
+           ${btn(portal, "Dejar mi reseña ⭐ →")}
+           <p style="font-size:12px;color:#B6B1BC;margin-top:14px">Si algo no llegó perfecto, respóndenos — lo arreglamos.</p>`
+        : `<p style="font-size:15px">Hi ${first}!</p>
+           <p style="font-size:15px;line-height:1.6">Your <b>${esc(order.item)}</b> should be with you by now — we hope it was love at first stitch. 🧶</p>
+           <p style="font-size:15px;line-height:1.6">Would you leave us a review? Two sentences and some stars help enormously (and Lulu reads every single one).</p>
+           ${btn(portal, "Leave my review ⭐ →")}
+           <p style="font-size:12px;color:#B6B1BC;margin-top:14px">If anything didn't arrive perfect, just reply — we'll make it right.</p>`),
+      { order_id: oid, kind });
+    await markSent(res as { status?: number });
+    return Response.json({ ok: true, res });
+  }
+
   if (kind === "order_shipped") {
     const res = await send(to,
       es ? `¡Tu pieza va en camino! 🎁 · ${order.code}` : `Your piece is on its way! 🎁 · ${order.code}`,

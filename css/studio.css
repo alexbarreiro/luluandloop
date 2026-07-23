@@ -171,6 +171,62 @@ main { flex: 1; padding: 24px 18px 60px; min-width: 0; }
 }
 /* the order photo doesn't need to grow with the wider drawer */
 .drawer img.photo { max-height: 300px; }
+
+/* Centered mode (default): a big magazine-style panel; the pin button docks
+   it back to the right edge */
+.drawer-root.centered .drawer {
+  right: auto; top: 50%; bottom: auto; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(1040px, 94vw); height: min(88vh, 860px);
+  border-radius: 24px; box-shadow: 0 40px 90px -30px rgba(44, 33, 26, .5);
+  column-width: 420px; column-gap: 34px; column-fill: auto;
+}
+.drawer-root.centered .drawer-top,
+.drawer-root.centered .drawer > h2,
+.drawer-root.centered .drawer-cust { column-span: all; }
+.drawer-root.centered .drawer-section,
+.drawer-root.centered .drawer-desc,
+.drawer-root.centered .drawer-chips,
+.drawer-root.centered .drawer-actions,
+.drawer-root.centered img.photo { break-inside: avoid; }
+.drawer-pin {
+  border: 1px solid var(--border); background: var(--warm); width: 30px; height: 30px;
+  border-radius: 50%; cursor: pointer; font-size: 14px; color: var(--text-2); padding: 0;
+}
+.drawer-pin:hover { color: var(--pink); border-color: var(--pink); }
+@media (max-width: 900px) {
+  .drawer-root.centered .drawer {
+    left: 0; right: 0; top: 0; bottom: 0; transform: none;
+    width: 100vw; height: 100%; border-radius: 0; column-width: auto;
+  }
+}
+
+/* Shipping pricing (cost vs customer price) */
+.ship-price-row { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.ship-price-row label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 800; }
+.ship-price-row input {
+  width: 90px; font-family: inherit; font-size: 14px; font-weight: 700; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--warm); color: var(--ink);
+}
+.ship-cost-note { font-size: 12.5px; font-weight: 700; color: var(--text-2); margin-top: 8px; }
+.margin-chip.gain { background: var(--green-bg); color: var(--green-tx); }
+.margin-chip.loss { background: var(--pink-soft); color: var(--pink-deep); }
+
+/* Financials */
+.fin-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 22px; }
+.fin-table { background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow-x: auto; margin-bottom: 24px; }
+.fin-table table { width: 100%; border-collapse: collapse; min-width: 720px; font-size: 13px; }
+.fin-table th {
+  text-align: right; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-2); background: var(--warm); padding: 11px 14px; border-bottom: 1px solid var(--border);
+}
+.fin-table th:first-child, .fin-table td:first-child { text-align: left; font-weight: 800; }
+.fin-table td { text-align: right; padding: 10px 14px; border-bottom: 1px solid #E8E7E5; font-weight: 600; }
+.fin-table tr:last-child td { border-bottom: none; }
+.fin-table tr.total td { font-weight: 900; background: var(--warm); }
+.fin-neg { color: var(--pink-deep); font-weight: 800; }
+.fin-pos { color: var(--green-tx); }
+.fin-section-title { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); margin: 0 0 10px; }
 .drawer-top { display: flex; align-items: center; justify-content: space-between; }
 .drawer-code { font-size: 12px; font-weight: 800; letter-spacing: .1em; color: var(--pink); }
 .drawer-close {

@@ -67,6 +67,25 @@
   .order-row .item { font-weight:800; font-size:14.5px; flex:1; }
   .order-row .code { font-size:11.5px; font-weight:800; color:var(--pink); }
   .muted { color:var(--muted); font-size:13px; }
+  .stars { display:flex; gap:6px; margin:8px 0 10px; }
+  .star { font-size:30px; background:none; border:none; cursor:pointer; color:#EAE6E9; padding:2px; }
+  .star.on { color:#E4657E; }
+  .review-done { background:var(--soft); border-radius:12px; padding:14px; font-size:14px; }
+  .prof-row { display:flex; flex-direction:column; gap:4px; margin-bottom:12px; font-size:13px; font-weight:800; }
+  .prof-row select { width:100%; box-sizing:border-box; font-family:inherit; font-size:16px; padding:12px 14px;
+    border:1px solid var(--border); border-radius:12px; background:var(--warm); color:var(--ink); }
+  .check-row { display:flex; align-items:center; gap:10px; font-size:14px; font-weight:700; margin-bottom:12px; }
+  .check-row input { width:18px; height:18px; accent-color:var(--pink); margin:0; }
+  .pay-line { display:flex; justify-content:space-between; gap:8px; font-size:13.5px; padding:8px 0;
+    border-bottom:1px dashed var(--border); flex-wrap:wrap; }
+  .pay-line .ref { font-family:ui-monospace,Menlo,monospace; font-size:11px; color:var(--muted); width:100%; }
+  .pay-line:last-of-type { border-bottom:none; }
+  .courtesy { color:#3E6B4A; font-weight:800; }
+  #invoice { display:none; }
+  @media print {
+    body.print-invoice .wrap { display:none; }
+    body.print-invoice #invoice { display:block; padding:40px; box-sizing:border-box; }
+  }
   [hidden] { display:none !important; }
 </style>
 </head>
@@ -101,6 +120,19 @@
       <button class="btn mini dark" id="btn-signout"></button>
     </div>
     <div id="order-list"></div>
+    <div style="border-top:1px dashed var(--border);margin-top:18px;padding-top:16px">
+      <h2 id="pf-title"></h2>
+      <div class="prof-row"><span id="pf-name-l"></span><input id="pf-name"></div>
+      <div class="prof-row"><span id="pf-lang-l"></span>
+        <select id="pf-lang"><option value="en">English</option><option value="es">Español</option></select></div>
+      <label class="check-row"><input type="checkbox" id="pf-marketing"><span id="pf-marketing-l"></span></label>
+      <button class="btn mini" id="pf-save"></button>
+      <div style="border-top:1px dashed var(--border);margin-top:16px;padding-top:14px">
+        <div class="prof-row"><span id="pf-pass-l"></span><input id="pf-pass" type="password" autocomplete="new-password"></div>
+        <button class="btn mini dark" id="pf-pass-save"></button>
+      </div>
+      <div class="err" id="pf-err"></div>
+    </div>
   </div>
 
   <!-- Single order -->
@@ -114,6 +146,26 @@
       <div class="meta"><span id="m-dep-label"></span><b id="m-dep"></b></div>
       <div class="meta"><span id="m-bal-label"></span><b id="m-bal"></b></div>
       <div class="meta" id="m-track-row" hidden><span id="m-track-label"></span><b><a id="m-track" target="_blank" rel="noopener noreferrer"></a></b></div>
+    </div>
+
+    <div class="card" id="pay-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <h2 id="pc-title"></h2>
+        <button class="btn mini dark" id="btn-print"></button>
+      </div>
+      <div id="pay-lines"></div>
+    </div>
+
+    <div class="card" id="review-card" hidden>
+      <h2 id="rv-title"></h2>
+      <div id="rv-done" class="review-done" hidden></div>
+      <div id="rv-form">
+        <div class="stars" id="rv-stars"></div>
+        <textarea id="rv-body" rows="3"></textarea>
+        <label class="attach" style="margin-bottom:10px">📎<input type="file" id="rv-file" accept="image/*,video/*" hidden><span id="rv-file-name"></span></label>
+        <button class="btn" id="rv-send"></button>
+        <div class="err" id="rv-err"></div>
+      </div>
     </div>
 
     <div class="approval" id="approval-card" hidden>
@@ -141,6 +193,8 @@
   </div>
 </div>
 
+<div id="invoice"></div>
+
 <script src="/js/config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
@@ -154,7 +208,10 @@
   var token = (params.get('t') || '').trim();
   var lang = params.get('lang') === 'es' ? 'es' : (localStorage.getItem('luluandloop.lang') || 'en');
   if (lang !== 'es') lang = 'en';
-  var state = { order: null, messages: [], orders: [], jwt: null, email: null, mode: 'signin' };
+  var state = { order: null, messages: [], orders: [], jwt: null, email: null, mode: 'signin', review: null, rvRating: 0, prefs: null };
+  if (sb) sb.auth.onAuthStateChange(function (_event, session) {
+    state.jwt = session ? session.access_token : state.jwt;
+  });
 
   var STR = { en: {
     stages: ['New request', 'Quote review', 'In progress', 'Ready', 'Shipped'],
@@ -168,7 +225,14 @@
     approve: 'I love it — approve ✓', approved: 'Approved ✓ · thank you!',
     pay: 'Pay balance', backList: '← All my orders',
     empty: 'No messages yet — say hola 👋', wrongLink: 'That link doesn’t match an order. Check the email we sent you, or sign in.',
-    needAll: 'Email and password (8+ characters) required', shipIncl: '+ shipping'
+    needAll: 'Email and password (8+ characters) required', shipIncl: '+ shipping',
+    pcTitle: 'Payments & invoice', print: 'Print invoice', shipping: 'Shipping', waived: 'waived — our treat 💗',
+    pending: 'pending', paidOn: 'paid', ref: 'ref',
+    rvTitle: 'How was it? Leave a review ⭐', rvPh: 'Two sentences make Lulu’s day…',
+    rvSend: 'Send my review', rvThanks: 'Thank you for your review! 💗', rvPick: 'Tap the stars first',
+    pfTitle: 'My profile', pfName: 'Display name', pfLang: 'Preferred language',
+    pfMarketing: 'Email me about new drops & studio news', pfSave: 'Save profile', pfSaved: 'Saved ✓',
+    pfPass: 'New password (min 8 characters)', pfPassSave: 'Change password', pfPassDone: 'Password changed ✓'
   }, es: {
     stages: ['Nueva solicitud', 'Revisión de cotización', 'En proceso', 'Lista', 'Enviada'],
     aTitle: 'Mis pedidos', aSub: 'Inicia sesión para ver tus piezas, escribirle al estudio y aprobar tu pieza terminada. El enlace de tu correo también funciona — sin cuenta.',
@@ -181,7 +245,14 @@
     approve: 'Me encanta — aprobar ✓', approved: 'Aprobada ✓ · ¡gracias!',
     pay: 'Pagar saldo', backList: '← Todos mis pedidos',
     empty: 'Aún no hay mensajes — di hola 👋', wrongLink: 'Ese enlace no coincide con un pedido. Revisa el correo que te enviamos, o inicia sesión.',
-    needAll: 'Se necesita correo y contraseña (8+ caracteres)', shipIncl: '+ envío'
+    needAll: 'Se necesita correo y contraseña (8+ caracteres)', shipIncl: '+ envío',
+    pcTitle: 'Pagos y factura', print: 'Imprimir factura', shipping: 'Envío', waived: 'sin costo — cortesía 💗',
+    pending: 'pendiente', paidOn: 'pagado', ref: 'ref',
+    rvTitle: '¿Qué tal llegó? Deja tu reseña ⭐', rvPh: 'Dos frases le hacen el día a Lulu…',
+    rvSend: 'Enviar mi reseña', rvThanks: '¡Gracias por tu reseña! 💗', rvPick: 'Primero toca las estrellas',
+    pfTitle: 'Mi perfil', pfName: 'Nombre', pfLang: 'Idioma preferido',
+    pfMarketing: 'Avísame de nuevos drops y noticias del estudio', pfSave: 'Guardar perfil', pfSaved: 'Guardado ✓',
+    pfPass: 'Nueva contraseña (mín. 8 caracteres)', pfPassSave: 'Cambiar contraseña', pfPassDone: 'Contraseña cambiada ✓'
   } };
   function t() { return STR[lang]; }
   function $(id) { return document.getElementById(id); }
@@ -216,6 +287,18 @@
     $('c-body').placeholder = t().cPh;
     $('c-send').textContent = t().send;
     $('back-list').textContent = t().backList;
+    $('pc-title').textContent = t().pcTitle;
+    $('btn-print').textContent = t().print;
+    $('rv-title').textContent = t().rvTitle;
+    $('rv-body').placeholder = t().rvPh;
+    $('rv-send').textContent = t().rvSend;
+    $('pf-title').textContent = t().pfTitle;
+    $('pf-name-l').textContent = t().pfName;
+    $('pf-lang-l').textContent = t().pfLang;
+    $('pf-marketing-l').textContent = t().pfMarketing;
+    $('pf-save').textContent = t().pfSave;
+    $('pf-pass-l').textContent = t().pfPass;
+    $('pf-pass-save').textContent = t().pfPassSave;
     document.documentElement.lang = lang;
   }
 
@@ -265,6 +348,55 @@
       } else pb.style.display = 'none';
     } else $('approval-card').hidden = true;
 
+    // payments & invoice
+    var ship = Number(o.shipping) || 0;
+    function payLine(label, amount, paidAt, ref, extra) {
+      return '<div class="pay-line"><span>' + esc(label) + (extra ? ' <span class="courtesy">' + esc(extra) + '</span>' : '') +
+        '</span><b>' + amount + (paidAt ? ' ✓' : ' · ' + t().pending) + '</b>' +
+        (ref ? '<span class="ref">' + t().ref + ': ' + esc(ref) + (paidAt ? ' · ' + t().paidOn + ' ' + esc(String(paidAt).slice(0, 10)) : '') + '</span>' : '') + '</div>';
+    }
+    $('pay-lines').innerHTML =
+      payLine((lang === 'es' ? 'Anticipo (40%)' : 'Deposit (40%)'), '$' + o.deposit, o.deposit_paid_at, o.deposit_ref) +
+      payLine((lang === 'es' ? 'Saldo (60%)' : 'Balance (60%)'), '$' + o.balance, o.balance_paid_at, o.balance_ref) +
+      (o.shipping_waived
+        ? payLine(t().shipping, '$0', true, null, t().waived)
+        : (ship ? payLine(t().shipping, '$' + ship.toFixed(2), o.balance_paid_at, null) : ''));
+
+    // invoice (print)
+    var inv = '<div style="font-family:sans-serif;color:#222">' +
+      '<h2 style="margin:0">Lulu &amp; Loop</h2>' +
+      '<div style="font-size:12px;color:#777">luluandloop.com · hello@luluandloop.com · Boston, MA</div>' +
+      '<hr><h3>' + (lang === 'es' ? 'Factura · ' : 'Invoice · ') + esc(o.code) + '</h3>' +
+      '<div>' + esc(o.customer || '') + '</div>' +
+      '<div style="margin:6px 0 14px">' + esc(o.item) + ' · ' + esc(o.size_label || '') + (o.rush ? ' · rush +25%' : '') + '</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
+      '<tr><td style="padding:6px;border-bottom:1px solid #ddd">' + (lang === 'es' ? 'Total de la pieza' : 'Piece total') + '</td><td style="text-align:right;border-bottom:1px solid #ddd">$' + o.price + '</td></tr>' +
+      '<tr><td style="padding:6px;border-bottom:1px solid #ddd">' + (lang === 'es' ? 'Anticipo pagado' : 'Deposit paid') + (o.deposit_paid_at ? ' (' + String(o.deposit_paid_at).slice(0, 10) + ')' : '') + '</td><td style="text-align:right;border-bottom:1px solid #ddd">$' + o.deposit + '</td></tr>' +
+      '<tr><td style="padding:6px;border-bottom:1px solid #ddd">' + (lang === 'es' ? 'Saldo' : 'Balance') + (o.balance_paid_at ? ' ✓' : '') + '</td><td style="text-align:right;border-bottom:1px solid #ddd">$' + o.balance + '</td></tr>' +
+      ((o.shipping_waived || ship) ? '<tr><td style="padding:6px">' + t().shipping + (o.shipping_waived ? ' — ' + (lang === 'es' ? 'cortesía' : 'courtesy') : '') + '</td><td style="text-align:right">$' + (o.shipping_waived ? '0.00' : ship.toFixed(2)) + '</td></tr>' : '') +
+      '</table>' +
+      (o.deposit_ref ? '<div style="font-size:11px;color:#999;margin-top:10px">Stripe: ' + esc(o.deposit_ref) + (o.balance_ref ? ' · ' + esc(o.balance_ref) : '') + '</div>' : '') +
+      '</div>';
+    document.getElementById('invoice').innerHTML = inv;
+
+    // review card (shipped orders only)
+    if (o.stage >= 4) {
+      $('review-card').hidden = false;
+      if (state.review) {
+        $('rv-done').hidden = false;
+        $('rv-form').hidden = true;
+        var stars = '';
+        for (var si = 1; si <= 5; si++) stars += si <= state.review.rating ? '★' : '☆';
+        $('rv-done').innerHTML = '<b style="color:var(--pink);font-size:18px;letter-spacing:3px">' + stars + '</b>' +
+          (state.review.body ? '<div style="margin-top:6px">“' + esc(state.review.body) + '”</div>' : '') +
+          '<div style="margin-top:6px;color:var(--deep);font-weight:800">' + t().rvThanks + '</div>';
+      } else {
+        $('rv-done').hidden = true;
+        $('rv-form').hidden = false;
+        renderStars();
+      }
+    } else $('review-card').hidden = true;
+
     $('thread').innerHTML = state.messages.map(function (m) {
       if (m.kind === 'system' || m.sender_kind === 'system') {
         return '<div class="bubble system">' + esc(m.body) + '</div>';
@@ -283,8 +415,14 @@
 
   function loadOrder(c, tk) {
     return portal({ action: 'get', code: c, token: tk || '' }).then(function (res) {
+      if (!state.order || state.order.code !== res.order.code) {
+        state.rvRating = 0;
+        var rvB = $('rv-body'); if (rvB) rvB.value = '';
+        var rvF = $('rv-file'); if (rvF) { rvF.value = ''; $('rv-file-name').textContent = ''; }
+      }
       state.order = res.order;
       state.messages = res.messages || [];
+      state.review = res.review || null;
       renderOrder();
     });
   }
@@ -310,6 +448,7 @@
   function afterAuth(session) {
     state.jwt = session.access_token;
     state.email = session.user && session.user.email;
+    loadProfile();
     portal({ action: 'list' }).then(function (res) {
       state.orders = res.orders || [];
       if (code) {
@@ -387,6 +526,100 @@
     portal({ action: 'approve', code: state.order.code, token: token || '' })
       .then(function () { return loadOrder(state.order.code, token); })
       .catch(function (e) { $('ap-err').textContent = e.message; $('btn-approve').disabled = false; });
+  });
+
+  function renderStars() {
+    var wrap = $('rv-stars');
+    if (!wrap.childElementCount) {
+      wrap.setAttribute('role', 'radiogroup');
+      wrap.setAttribute('aria-label', lang === 'es' ? 'Calificación' : 'Rating');
+      for (var i = 1; i <= 5; i++) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'star';
+        b.setAttribute('role', 'radio');
+        b.setAttribute('data-star', String(i));
+        b.textContent = '★';
+        b.addEventListener('click', function (ev) {
+          state.rvRating = Number(ev.currentTarget.getAttribute('data-star'));
+          renderStars();
+        });
+        wrap.appendChild(b);
+      }
+    }
+    Array.prototype.forEach.call(wrap.children, function (b, idx) {
+      var i = idx + 1;
+      b.classList.toggle('on', i <= state.rvRating);
+      b.setAttribute('aria-checked', String(i === state.rvRating));
+      b.setAttribute('aria-label', i + (lang === 'es' ? (i === 1 ? ' estrella' : ' estrellas') : (i === 1 ? ' star' : ' stars')));
+    });
+  }
+  $('rv-file').addEventListener('change', function () {
+    $('rv-file-name').textContent = $('rv-file').files[0] ? $('rv-file').files[0].name : '';
+  });
+  $('rv-send').addEventListener('click', function () {
+    if (!state.rvRating) { $('rv-err').textContent = t().rvPick; return; }
+    var fd = new FormData();
+    fd.append('code', state.order.code);
+    fd.append('token', token || '');
+    fd.append('rating', String(state.rvRating));
+    fd.append('body', $('rv-body').value.trim());
+    if ($('rv-file').files[0]) fd.append('file', $('rv-file').files[0]);
+    $('rv-send').disabled = true;
+    var headers = state.jwt ? { Authorization: 'Bearer ' + state.jwt } : {};
+    fetch(fnUrl(), { method: 'POST', headers: headers, body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        $('rv-send').disabled = false;
+        if (j.error) { $('rv-err').textContent = j.error; return; }
+        state.review = { rating: state.rvRating, body: $('rv-body').value.trim() };
+        renderOrder();
+      })
+      .catch(function () { $('rv-send').disabled = false; $('rv-err').textContent = 'Connection issue — try again.'; });
+  });
+  $('btn-print').addEventListener('click', function () {
+    document.body.classList.add('print-invoice');
+    window.print();
+    setTimeout(function () { document.body.classList.remove('print-invoice'); }, 500);
+  });
+
+  function loadProfile() {
+    $('pf-save').disabled = true;
+    portal({ action: 'profile-get' }).then(function (res) {
+      state.prefs = res.prefs;
+      $('pf-name').value = res.prefs.display_name || '';
+      $('pf-lang').value = res.prefs.lang || 'en';
+      $('pf-marketing').checked = res.prefs.marketing !== false;
+      $('pf-save').disabled = false;
+    }).catch(function () { $('pf-err').textContent = 'Profile unavailable — reload to retry.'; });
+  }
+  $('pf-save').addEventListener('click', function () {
+    $('pf-save').disabled = true;
+    portal({ action: 'profile-set', prefs: {
+      display_name: $('pf-name').value.trim(),
+      lang: $('pf-lang').value,
+      marketing: $('pf-marketing').checked
+    } }).then(function () {
+      $('pf-save').disabled = false;
+      $('pf-err').textContent = '';
+      if ($('pf-lang').value !== lang) setLang($('pf-lang').value);
+      $('pf-save').textContent = t().pfSaved;
+      setTimeout(function () { $('pf-save').textContent = t().pfSave; }, 2000);
+    }).catch(function (e) { $('pf-save').disabled = false; $('pf-err').textContent = e.message; });
+  });
+  $('pf-pass-save').addEventListener('click', function () {
+    var pw = $('pf-pass').value;
+    if (pw.length < 8) { $('pf-err').textContent = t().needAll; return; }
+    if (!sb) return;
+    $('pf-pass-save').disabled = true;
+    sb.auth.updateUser({ password: pw }).then(function (res) {
+      $('pf-pass-save').disabled = false;
+      if (res.error) { $('pf-err').textContent = res.error.message; return; }
+      $('pf-pass').value = '';
+      $('pf-err').textContent = '';
+      $('pf-pass-save').textContent = t().pfPassDone;
+      setTimeout(function () { $('pf-pass-save').textContent = t().pfPassSave; }, 2000);
+    });
   });
 
   /* ---------- boot ---------- */

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lulu &amp; Loop — ¡Gracias!</title>
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,700;6..12,800;6..12,900&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#FFF8F0; font-family:'Nunito Sans',system-ui,sans-serif; color:#2A2A33;
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; box-sizing:border-box; }
+  .card { background:#FFFEFC; border:1px solid #F0E2D8; border-radius:24px; padding:38px 32px;
+    max-width:480px; width:100%; box-sizing:border-box; text-align:center; }
+  .check { width:84px; height:84px; border-radius:50%; background:#E4657E; color:#FFF4F2; font-size:40px;
+    display:flex; align-items:center; justify-content:center; margin:0 auto 20px; animation:pop .5s ease both; }
+  @keyframes pop { 0%{transform:scale(.6);opacity:0} 70%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
+  h1 { font-weight:900; letter-spacing:-.02em; font-size:30px; margin:0 0 10px; }
+  p { color:#6E6E7A; font-size:15.5px; line-height:1.65; margin:0 0 12px; }
+  .code { display:inline-block; background:#FBDDE6; color:#9A4B60; font-weight:900; font-size:20px;
+    border-radius:14px; padding:12px 24px; margin:8px 0 18px; letter-spacing:.03em; }
+  .btn { display:inline-block; background:#2A2A33; color:#FFF8F0; font-weight:800; font-size:15px;
+    padding:15px 28px; border-radius:999px; text-decoration:none; margin:4px 6px; }
+  .btn:hover { background:#E4657E; }
+  .btn.pink { background:#E4657E; color:#FFF4F2; } .btn.pink:hover { background:#2A2A33; }
+  .note { font-size:13px; color:#B6B1BC; margin-top:18px; line-height:1.6; }
+  .word { font-weight:900; font-size:19px; margin-bottom:22px; } .word .amp { color:#E4657E; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="word">Lulu <span class="amp">&amp;</span> Loop</div>
+    <div class="check">✓</div>
+    <h1 id="t-title"></h1>
+    <p id="t-sub"></p>
+    <div class="code" id="t-code" hidden></div>
+    <div>
+      <a class="btn pink" id="t-portal" href="/orders/"></a>
+      <a class="btn" id="t-home" href="/"></a>
+    </div>
+    <p class="note" id="t-note"></p>
+  </div>
+<script>
+(function () {
+  'use strict';
+  // the wizard stashed the form before redirecting to Stripe — clear the PII
+  try { sessionStorage.removeItem('luluandloop.pendingForm'); } catch (e) { /* ignore */ }
+  var params = new URLSearchParams(location.search);
+  var kind = params.get('kind') === 'balance' ? 'balance' : 'deposit';
+  var code = (params.get('code') || '').replace(/[^\w-]/g, '');
+  var lang = params.get('lang') === 'es' ? 'es' : 'en';
+  var T = lang === 'es' ? {
+    depTitle: '¡Gracias! Tu pieza está en la fila 🧶',
+    depSub: 'Recibimos tu anticipo. Lulu revisa tu idea personalmente y confirma la cotización final en 24 horas.',
+    balTitle: '¡Saldo recibido! 🎁',
+    balSub: 'Tu pieza recibe sus últimos toques y se envía en cuanto imprimamos la etiqueta. Te llega el rastreo por correo.',
+    portal: 'Ver mi pedido →', home: 'Volver al inicio',
+    depNote: 'Te enviamos un correo de confirmación con un enlace mágico a tu pedido. Tip: crea una cuenta en el portal con el mismo correo de tu compra y verás todas tus piezas en un solo lugar.',
+    balNote: 'Cuando llegue tu pieza, nos encantaría ver tu reacción — el enlace estará en tu correo de envío.'
+  } : {
+    depTitle: '¡Gracias! Your piece is in the queue 🧶',
+    depSub: 'We received your deposit. Lulu personally reviews your idea and confirms the final quote within 24 hours.',
+    balTitle: 'Balance received! 🎁',
+    balSub: 'Your piece is getting its final touches and ships as soon as we print the label. Tracking lands in your inbox.',
+    portal: 'View my order →', home: 'Back to the site',
+    depNote: 'A confirmation email with a magic link to your order is on its way. Tip: create an account on the portal with your checkout email to see all your pieces in one place.',
+    balNote: 'When your piece arrives we’d love to see your reaction — the share link will be in your shipping email.'
+  };
+  document.documentElement.lang = lang;
+  document.getElementById('t-title').textContent = kind === 'balance' ? T.balTitle : T.depTitle;
+  document.getElementById('t-sub').textContent = kind === 'balance' ? T.balSub : T.depSub;
+  document.getElementById('t-note').textContent = kind === 'balance' ? T.balNote : T.depNote;
+  document.getElementById('t-portal').textContent = T.portal;
+  document.getElementById('t-home').textContent = T.home;
+  if (code) {
+    var c = document.getElementById('t-code');
+    c.textContent = code;
+    c.hidden = false;
+    document.getElementById('t-portal').href = '/orders/?code=' + encodeURIComponent(code) + '&lang=' + lang;
+  }
+})();
+</script>
+</body>
+</html>
