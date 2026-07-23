@@ -35,11 +35,17 @@ Deno.serve(async (req) => {
 
     let dbError = null;
     if (orderId && kind === "deposit") {
+      // Stripe surfaces the collected address under shipping_details
+      // (or collected_information on newer API versions)
+      const ship = (session as unknown as Record<string, any>).shipping_details ??
+        (session as unknown as Record<string, any>).collected_information?.shipping_details ?? null;
       const { error } = await supabase.from("orders").update({
         pending: false,
         stage: 2, // Queue · paid
         deposit_paid_at: new Date().toISOString(),
         deposit_ref: ref,
+        shipping_name: ship?.name ?? null,
+        shipping_address: ship?.address ?? null,
       }).eq("id", orderId).eq("pending", true); // idempotent: no-op on retries
       dbError = error;
     } else if (orderId && kind === "balance") {

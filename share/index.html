@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lulu &amp; Loop — Share your piece</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,700;6..12,800;6..12,900&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #FFF8F0; font-family: 'Nunito Sans', system-ui, sans-serif; color: #2A2A33;
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+  .card { background: #FFFEFC; border: 1px solid #F0E2D8; border-radius: 22px; padding: 30px; max-width: 440px; width: 100%; box-sizing: border-box; }
+  .word { font-weight: 900; font-size: 22px; }
+  .word .amp { color: #E4657E; }
+  h1 { font-weight: 900; letter-spacing: -.02em; font-size: 24px; margin: 18px 0 6px; }
+  p { color: #6E6E7A; font-size: 14.5px; line-height: 1.6; margin: 0 0 8px; }
+  .code-chip { display: inline-block; background: #FBDDE6; color: #9A4B60; font-weight: 800; font-size: 12.5px;
+    border-radius: 999px; padding: 6px 14px; margin-top: 10px; }
+  .drop { border: 2px dashed #F0E2D8; border-radius: 14px; padding: 26px 16px; text-align: center;
+    font-size: 16px; font-weight: 700; color: #6E6E7A; cursor: pointer; margin: 18px 0 12px; background: #FFF8F0; }
+  .drop.has { border-color: #E4657E; color: #9A4B60; }
+  textarea { width: 100%; box-sizing: border-box; font-family: inherit; font-size: 16px; padding: 13px 14px;
+    border: 1px solid #F0E2D8; border-radius: 12px; background: #FFF8F0; color: #2A2A33; resize: vertical; }
+  button.send { width: 100%; margin-top: 14px; border: none; cursor: pointer; background: #E4657E; color: #FFF4F2;
+    font-weight: 800; font-size: 16px; padding: 15px; border-radius: 999px; font-family: inherit; }
+  button.send:hover { background: #2A2A33; }
+  button.send:disabled { background: #EAE6E9; color: #B6B1BC; }
+  .err { color: #BB5367; font-size: 13px; font-weight: 700; margin-top: 10px; display: none; }
+  .err.show { display: block; }
+  .done { text-align: center; display: none; }
+  .done .check { width: 74px; height: 74px; border-radius: 50%; background: #E4657E; color: #FFF4F2; font-size: 34px;
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="word">Lulu <span class="amp">&amp;</span> Loop</div>
+    <div id="form-view">
+      <h1 id="tt-title">Share your piece! 🎁</h1>
+      <p id="tt-sub">We’d love to see your reaction — a photo or a short video of the unboxing makes Lulu’s whole week.</p>
+      <span class="code-chip" id="order-chip"></span>
+      <div class="drop" id="drop">📷 <span id="drop-label">Tap to add a photo or video</span></div>
+      <input type="file" id="file" accept="image/*,video/*" hidden>
+      <textarea id="note" rows="2" placeholder="A little note for Lulu (optional)"></textarea>
+      <button class="send" id="send">Send it to the studio →</button>
+      <div class="err" id="err"></div>
+    </div>
+    <div class="done" id="done-view">
+      <div class="check">✓</div>
+      <h1 id="done-title">¡Gracias! It’s in Lulu’s hands</h1>
+      <p id="done-sub">Thank you for sharing — with your permission we might feature it. It means the world. 💗</p>
+    </div>
+  </div>
+
+<script src="/js/config.js"></script>
+<script>
+(function () {
+  'use strict';
+  var params = new URLSearchParams(location.search);
+  var code = params.get('code') || '';
+  var token = params.get('t') || '';
+  var lang = params.get('lang') === 'es' ? 'es' : 'en';
+  var cfg = window.LULU_CONFIG || {};
+  var cloud = !!(cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY);
+
+  var T = lang === 'es' ? {
+    title: '¡Comparte tu pieza! 🎁',
+    sub: 'Nos encantaría ver tu reacción — una foto o un video corto del unboxing le hace la semana a Lulu.',
+    drop: 'Toca para agregar foto o video', note: 'Una notita para Lulu (opcional)',
+    send: 'Enviar al estudio →', sending: 'Enviando…',
+    doneTitle: '¡Gracias! Ya está en manos de Lulu',
+    doneSub: 'Gracias por compartir — con tu permiso quizá la presumimos. Significa muchísimo. 💗',
+    noFile: 'Agrega una foto o video primero.', badLink: 'Este enlace no coincide con un pedido — revisa el correo que te enviamos.'
+  } : {
+    title: 'Share your piece! 🎁',
+    sub: 'We’d love to see your reaction — a photo or a short video of the unboxing makes Lulu’s whole week.',
+    drop: 'Tap to add a photo or video', note: 'A little note for Lulu (optional)',
+    send: 'Send it to the studio →', sending: 'Sending…',
+    doneTitle: '¡Gracias! It’s in Lulu’s hands',
+    doneSub: 'Thank you for sharing — with your permission we might feature it. It means the world. 💗',
+    noFile: 'Add a photo or video first.', badLink: 'This link doesn’t match an order — check the email we sent you.'
+  };
+  document.getElementById('tt-title').textContent = T.title;
+  document.getElementById('tt-sub').textContent = T.sub;
+  document.getElementById('drop-label').textContent = T.drop;
+  document.getElementById('note').placeholder = T.note;
+  document.getElementById('send').textContent = T.send;
+  document.getElementById('order-chip').textContent = code || '—';
+  document.documentElement.lang = lang;
+
+  var fileInput = document.getElementById('file');
+  var drop = document.getElementById('drop');
+  drop.addEventListener('click', function () { fileInput.click(); });
+  fileInput.addEventListener('change', function () {
+    if (fileInput.files[0]) {
+      document.getElementById('drop-label').textContent = fileInput.files[0].name + ' ✓';
+      drop.classList.add('has');
+    }
+  });
+
+  function fail(msg) {
+    var e = document.getElementById('err');
+    e.textContent = msg; e.classList.add('show');
+    var b = document.getElementById('send');
+    b.disabled = false; b.textContent = T.send;
+  }
+
+  document.getElementById('send').addEventListener('click', function () {
+    document.getElementById('err').classList.remove('show');
+    var file = fileInput.files[0];
+    if (!file) { fail(T.noFile); return; }
+    var btn = document.getElementById('send');
+    btn.disabled = true; btn.textContent = T.sending;
+    var note = document.getElementById('note').value.trim();
+
+    function done() {
+      document.getElementById('form-view').style.display = 'none';
+      var d = document.getElementById('done-view');
+      document.getElementById('done-title').textContent = T.doneTitle;
+      document.getElementById('done-sub').textContent = T.doneSub;
+      d.style.display = 'block';
+    }
+
+    if (cloud) {
+      var fd = new FormData();
+      fd.append('code', code); fd.append('token', token);
+      fd.append('note', note); fd.append('file', file);
+      fetch(cfg.SUPABASE_URL + '/functions/v1/customer-upload', { method: 'POST', body: fd })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) {
+          if (!res.ok || res.j.error) throw new Error(res.j.error || 'upload failed');
+          done();
+        })
+        .catch(function (e) { fail(e.message === 'Failed to fetch' ? 'Connection issue — try again.' : e.message); });
+    } else {
+      // demo mode: keep it in this browser so the studio demo can show it
+      try {
+        var ups = JSON.parse(localStorage.getItem('luluandloop.demo.shares') || '[]');
+        var entry = { order_code: code || 'LU-DEMO', name: file.name, note: note, data: '', created_at: new Date().toISOString() };
+        if (file.size <= 400 * 1024 && /^image\//.test(file.type)) {
+          var rd = new FileReader();
+          rd.onload = function () { entry.data = String(rd.result); ups.unshift(entry);
+            localStorage.setItem('luluandloop.demo.shares', JSON.stringify(ups)); done(); };
+          rd.onerror = function () { ups.unshift(entry); localStorage.setItem('luluandloop.demo.shares', JSON.stringify(ups)); done(); };
+          rd.readAsDataURL(file);
+          return;
+        }
+        ups.unshift(entry);
+        localStorage.setItem('luluandloop.demo.shares', JSON.stringify(ups));
+      } catch (e) { /* storage unavailable */ }
+      done();
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -113,7 +113,6 @@
       <div class="story-sign display">— Lourdes “Lulu”</div>
       <div class="story-stats">
         <span data-i18n="storyStat1">3 years in business</span>
-        <span data-i18n="storyStat2">5 artisans</span>
         <span data-i18n="storyStat3">Cuba → CDMX → Boston</span>
       </div>
     </div>
@@ -164,35 +163,37 @@
       <p class="step1-sub" data-i18n="s1Sub">Three choices and a few words — that’s all it takes. Your price updates live on the right, and Lulu personally confirms every quote within 24h.</p>
       <div class="step1-grid">
         <div class="form-col">
-          <div>
+          <div class="m-pane" data-pane="1">
             <div class="field-label">1 · <span data-i18n="fCat">What are we making?</span></div>
             <div class="cat-grid" id="cat-grid"></div>
           </div>
-          <div>
+          <div class="m-pane" data-pane="2">
             <div class="field-label">2 · <span data-i18n="fSize">Pick a size</span></div>
             <div class="size-pills" id="size-pills"></div>
           </div>
-          <div>
-            <div class="field-label">3 · <span data-i18n="fDesc">Describe your idea</span></div>
-            <textarea id="f-desc" rows="4" data-i18n-ph="fDescPh"></textarea>
-            <div class="field-hint" data-i18n="fDescHint">A photo, a sketch or three sentences — anything works. You can send reference photos after checkout too.</div>
-          </div>
-          <div class="two-col">
-            <label class="small-field"><span><span data-i18n="fColors">Colors</span> <span class="opt" style="font-weight:600;color:var(--muted)" data-i18n="optional">(optional)</span></span>
-              <input id="f-colors" data-i18n-ph="fColorsPh">
-            </label>
+          <div class="m-pane m-pane-group" data-pane="3">
+            <div>
+              <div class="field-label">3 · <span data-i18n="fDesc">Describe your idea</span></div>
+              <textarea id="f-desc" rows="4" data-i18n-ph="fDescPh"></textarea>
+              <div class="field-hint" data-i18n="fDescHint">A photo, a sketch or three sentences — anything works. You can send reference photos after checkout too.</div>
+            </div>
+            <div>
+              <div class="field-label"><span data-i18n="fColors">Colors</span> <span class="opt" style="font-weight:600;color:var(--muted)" data-i18n="optional">(optional)</span></div>
+              <div class="palette" id="palette"></div>
+              <input id="f-colors" class="palette-other" data-i18n-ph="fColorsPh">
+            </div>
             <div class="small-field"><span><span data-i18n="fRef">Reference</span> <span class="opt" style="font-weight:600;color:var(--muted)" data-i18n="optional">(optional)</span></span>
               <div class="dropzone" id="dropzone" role="button" tabindex="0">📎 <span id="dropzone-label" data-i18n="fRefPh">Drop a photo or sketch</span></div>
               <input type="file" id="f-ref" accept="image/*,.pdf" hidden>
             </div>
+            <label class="rush-row">
+              <input type="checkbox" id="f-rush">
+              <span class="rush-label"><span data-i18n="fRush">⚡ Rush my piece</span> <span class="sub" data-i18n="fRushSub">+25% · jumps the queue, −40% wait</span></span>
+            </label>
           </div>
-          <label class="rush-row">
-            <input type="checkbox" id="f-rush">
-            <span class="rush-label"><span data-i18n="fRush">⚡ Rush my piece</span> <span class="sub" data-i18n="fRushSub">+25% · jumps the queue, −40% wait</span></span>
-          </label>
         </div>
 
-        <div class="summary-card">
+        <div class="summary-card m-pane" data-pane="4">
           <div class="summary-eyebrow" data-i18n="estTitle">Your estimate</div>
           <div class="summary-item" id="q-item"></div>
           <div class="summary-row"><span class="lab" data-i18n="qBase">Base price</span><span class="val" id="q-base"></span></div>
@@ -207,6 +208,17 @@
           <div class="continue-hint" id="continue-hint" hidden>✎ <span data-i18n="contHint">Describe your idea to continue</span></div>
           <div class="summary-note" data-i18n="estNote">You only pay the deposit today. Lulu confirms your final quote within 24h — if anything changes, you approve it first.</div>
         </div>
+      </div>
+
+      <!-- Mobile-only bottom bar: live total + pane navigation -->
+      <div class="mbar" id="mbar">
+        <div class="mbar-dots" id="mbar-dots" aria-hidden="true"></div>
+        <div class="mbar-info">
+          <span class="mbar-total" id="mbar-total"></span>
+          <span class="mbar-dep" id="mbar-dep"></span>
+        </div>
+        <button class="mbar-back" id="mbar-back" aria-label="Back">←</button>
+        <button class="mbar-next" id="mbar-next"></button>
       </div>
     </div>
 

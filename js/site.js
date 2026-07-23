@@ -70,7 +70,7 @@
     storyP1: 'Lourdes — Lulu to everyone who loves her — learned to crochet as a girl in Cuba, where a skein of yarn was worth more than gold and nothing ever went to waste.',
     storyP2: 'In México she turned the craft into a company, teaching a small circle of artisans that a toy stitched by hand carries something a factory can never copy.',
     storyP3: 'Today she works from Boston, near her daughter and grandkids — the first testers of every new design. Five artisans, two languages, one rule: made with love, or not at all.',
-    storyStat1: '3 years in business', storyStat2: '5 artisans', storyStat3: 'Cuba → CDMX → Boston',
+    storyStat1: '3 years in business', storyStat3: 'Cuba → CDMX → Boston',
     bandTitle: 'Your imagination, our hands.',
     footBlurb: 'A bilingual, made-to-order crochet studio. One-of-one pieces, stitched by hand and shipped worldwide.',
     footContact: 'Say hello', footPolicy: 'Good to know',
@@ -106,6 +106,7 @@
     confEmail: 'confirmation sent to', yourEmail: 'your email',
     week: ' week', weeks: ' weeks',
     step1Chip: 'Design it', step2Chip: 'Deposit', step3Chip: 'Confirmed',
+    mNext: 'Next', mEstimate: 'See estimate',
     from: 'from ',
     steps: [
       { n: '01', title: 'Tell us your dream', body: 'A photo, a sketch, three sentences — any idea works. Pick a category and size.' },
@@ -138,7 +139,7 @@
     storyP1: 'Lourdes — Lulu para quien la quiere — aprendió a tejer de niña en Cuba, donde una madeja de estambre valía oro y nada se desperdiciaba.',
     storyP2: 'En México convirtió el oficio en una empresa, enseñando a un pequeño círculo de artesanas que un juguete tejido a mano lleva algo que ninguna fábrica puede copiar.',
     storyP3: 'Hoy trabaja desde Boston, cerca de su hija y sus nietos — los primeros probadores de cada diseño. Cinco artesanas, dos idiomas, una regla: hecho con amor, o no se hace.',
-    storyStat1: '3 años de trayectoria', storyStat2: '5 artesanas', storyStat3: 'Cuba → CDMX → Boston',
+    storyStat1: '3 años de trayectoria', storyStat3: 'Cuba → CDMX → Boston',
     bandTitle: 'Tu imaginación, nuestras manos.',
     footBlurb: 'Un estudio bilingüe de crochet a pedido. Piezas únicas, tejidas a mano y enviadas a todo el mundo.',
     footContact: 'Escríbenos', footPolicy: 'Bueno saber',
@@ -174,6 +175,7 @@
     confEmail: 'confirmación enviada a', yourEmail: 'tu correo',
     week: ' semana', weeks: ' semanas',
     step1Chip: 'Diseña', step2Chip: 'Anticipo', step3Chip: 'Confirmado',
+    mNext: 'Siguiente', mEstimate: 'Ver estimado',
     from: 'desde ',
     steps: [
       { n: '01', title: 'Cuéntanos tu sueño', body: 'Una foto, un boceto, tres frases — cualquier idea sirve. Elige categoría y tamaño.' },
@@ -196,6 +198,24 @@
     '/assets/blanket-mint.jpg', '/assets/doll-blue.jpg', '/assets/blanket-white.jpg',
     '/assets/bunny-overalls.jpg', '/assets/bear-fairy.jpg'];
 
+  /* Yarn palette — pick up to 4, plus free text for anything else */
+  var PALETTE = [
+    { id: 'blush', en: 'Blush pink', es: 'Rosa viejo', hex: '#E8A9B8' },
+    { id: 'cream', en: 'Cream', es: 'Crema', hex: '#F3E9D7' },
+    { id: 'sage', en: 'Sage', es: 'Salvia', hex: '#A8BFA0' },
+    { id: 'butter', en: 'Butter yellow', es: 'Amarillo suave', hex: '#F2D98C' },
+    { id: 'sky', en: 'Sky blue', es: 'Azul cielo', hex: '#9CC3E4' },
+    { id: 'navy', en: 'Navy', es: 'Azul marino', hex: '#33456E' },
+    { id: 'brick', en: 'Brick red', es: 'Rojo ladrillo', hex: '#B5483A' },
+    { id: 'lavender', en: 'Lavender', es: 'Lavanda', hex: '#B9A8D8' },
+    { id: 'mint', en: 'Mint', es: 'Menta', hex: '#ABDCC9' },
+    { id: 'terracotta', en: 'Terracotta', es: 'Terracota', hex: '#C97B4F' },
+    { id: 'chocolate', en: 'Chocolate', es: 'Chocolate', hex: '#6E4B34' },
+    { id: 'gray', en: 'Gray', es: 'Gris', hex: '#9A9AA2' },
+    { id: 'white', en: 'White', es: 'Blanco', hex: '#FDFDFB' },
+    { id: 'black', en: 'Black', es: 'Negro', hex: '#2B2B30' }];
+  var PALETTE_MAX = 4;
+
   var TITLES = {
     en: 'Lulu & Loop — Custom crochet, made to order',
     es: 'Lulu & Loop — Crochet a medida, hecho a pedido'
@@ -211,13 +231,26 @@
     paying: false,
     orderCode: null,
     checkoutHint: null, // null | 'validate' | 'canceled' | 'error'
-    form: { cat: 'dolls', size: 1, colors: '', desc: '', name: '', email: '', rush: false, refName: '' }
+    mpane: 1, // mobile sub-step within step 1 (1 category · 2 size · 3 details · 4 estimate)
+    form: { cat: 'dolls', size: 1, colors: '', palette: [], desc: '', name: '', email: '', rush: false, refName: '' }
   };
   if (state.lang !== 'en' && state.lang !== 'es') state.lang = 'en';
 
   function t() { return STR[state.lang]; }
   function fmt(n) { return '$' + n; }
   function $(id) { return document.getElementById(id); }
+  var mobileMQ = window.matchMedia('(max-width: 740px)');
+
+  // Selected palette names (localized) + free text, joined for the order record
+  function composedColors() {
+    var names = state.form.palette.map(function (id) {
+      var p = PALETTE.find(function (x) { return x.id === id; });
+      return p ? (state.lang === 'en' ? p.en : p.es).toLowerCase() : null;
+    }).filter(Boolean);
+    var custom = state.form.colors.trim();
+    if (custom) names.push(custom);
+    return names.join(', ');
+  }
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -356,6 +389,58 @@
     });
   }
 
+  function renderPalette() {
+    var sel = state.form.palette;
+    $('palette').innerHTML = PALETTE.map(function (p) {
+      var on = sel.indexOf(p.id) > -1;
+      var light = ['cream', 'white', 'butter', 'mint'].indexOf(p.id) > -1;
+      return '<button type="button" class="swatch' + (on ? ' on' : '') + (light ? ' light' : '') +
+        '" data-color="' + p.id + '" style="--sw:' + p.hex + '" aria-pressed="' + on + '">' +
+        '<span class="swatch-dot"></span>' + esc(state.lang === 'en' ? p.en : p.es) +
+        (on ? ' ✓' : '') + '</button>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('.swatch'), function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-color');
+        var i = state.form.palette.indexOf(id);
+        if (i > -1) state.form.palette.splice(i, 1);
+        else if (state.form.palette.length < PALETTE_MAX) state.form.palette.push(id);
+        renderPalette();
+        // the rebuild destroyed the focused button — restore keyboard focus
+        var nb = document.querySelector('.swatch[data-color="' + id + '"]');
+        if (nb) nb.focus();
+      });
+    });
+  }
+
+  /* ---------- Mobile sub-steps (step 1 only) ---------- */
+  function renderMobileBar() {
+    var q = quote(), tt = t();
+    var w = $('wizard');
+    w.setAttribute('data-mpane', String(state.mpane));
+    $('mbar-total').textContent = tt.qTotal + ' ' + fmt(q.total);
+    $('mbar-dep').textContent = tt.depositLabel + ' · ' + fmt(q.deposit);
+    $('mbar-dots').innerHTML = [1, 2, 3, 4].map(function (n) {
+      return '<span class="mdot' + (n === state.mpane ? ' on' : n < state.mpane ? ' done' : '') + '"></span>';
+    }).join('');
+    $('mbar-back').hidden = state.mpane === 1;
+    var next = $('mbar-next');
+    if (state.mpane === 4) {
+      var disabled = !state.form.desc.trim();
+      next.textContent = tt.contBtn + ' →';
+      next.disabled = disabled;
+    } else {
+      next.textContent = (state.mpane === 3 ? tt.mEstimate : tt.mNext) + ' →';
+      next.disabled = false;
+    }
+  }
+
+  function goPane(n) {
+    state.mpane = Math.max(1, Math.min(4, n));
+    renderMobileBar();
+    window.scrollTo(0, 0);
+  }
+
   function renderSummary() {
     var q = quote(), tt = t();
     $('q-item').textContent = (state.lang === 'en' ? q.cat.en : q.cat.es) + ' · ' +
@@ -374,6 +459,7 @@
     btn.disabled = disabled;
     btn.textContent = tt.contBtn + ' · ' + fmt(q.deposit) + ' →';
     $('continue-hint').hidden = !disabled;
+    renderMobileBar();
   }
 
   function renderCheckout() {
@@ -420,7 +506,7 @@
   function renderWizard() {
     $('wizard').setAttribute('data-step', String(state.step));
     renderStepper();
-    if (state.step === 1) { renderCatCards(); renderSizePills(); renderSummary(); }
+    if (state.step === 1) { renderCatCards(); renderSizePills(); renderPalette(); renderSummary(); }
     if (state.step === 2) renderCheckout();
     if (state.step === 3) renderTimeline();
   }
@@ -472,7 +558,7 @@
       item: (state.lang === 'en' ? q.cat.en : q.cat.es) + ' · ' + (state.lang === 'en' ? q.sz.en : q.sz.es),
       size: (state.lang === 'en' ? q.sz.en : q.sz.es) + ' · ' + q.sz.dim,
       price: q.total, stage: 2, artisan: '', img: q.cat.img,
-      desc: f.desc, colors: f.colors || '—', rush: f.rush,
+      desc: f.desc, colors: composedColors() || '—', rush: f.rush,
       lang: state.lang, createdAt: new Date().toISOString()
     };
     try {
@@ -495,9 +581,17 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-start]'), function (el) {
       el.addEventListener('click', function () {
         state.step = 1;
+        state.mpane = 1;
         if (isOrderRoute()) { renderWizard(); window.scrollTo(0, 0); }
         else location.hash = 'order';
       });
+    });
+
+    $('mbar-back').addEventListener('click', function () { goPane(state.mpane - 1); });
+    $('mbar-next').addEventListener('click', function () {
+      if (state.mpane < 4) { goPane(state.mpane + 1); return; }
+      if (!state.form.desc.trim()) return;
+      goStep(2);
     });
 
     $('back-home').addEventListener('click', function () { location.hash = ''; });
@@ -566,7 +660,7 @@
           size_idx: Math.min(state.form.size, q.cat.sizes.length - 1),
           rush: state.form.rush,
           desc: state.form.desc.trim(),
-          colors: state.form.colors.trim() || '—',
+          colors: composedColors() || '—',
           lang: state.lang
         }).then(function (res) {
           location.href = res.url; // Stripe-hosted checkout page
@@ -589,10 +683,14 @@
 
     $('btn-again').addEventListener('click', function () {
       state.step = 1;
+      state.mpane = 1;
       state.orderCode = null;
       state.form.desc = '';
       state.form.rush = false;
       state.form.refName = '';
+      state.form.palette = [];
+      state.form.colors = '';
+      $('f-colors').value = '';
       $('f-desc').value = '';
       $('f-rush').checked = false;
       $('dropzone').classList.remove('has-file');

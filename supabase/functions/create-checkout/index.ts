@@ -117,6 +117,15 @@ Deno.serve(async (req) => {
     mode: "payment",
     payment_method_types: ["card"],
     customer_email: email,
+    // Collect the shipping address up front so the studio can quote real
+    // shipping (Shippo) when the piece is ready
+    shipping_address_collection: {
+      allowed_countries: [
+        "US", "CA", "MX", "GB", "IE", "FR", "ES", "DE", "IT", "PT", "NL", "BE",
+        "CH", "AT", "SE", "NO", "DK", "FI", "PL", "CZ", "AU", "NZ", "JP", "KR",
+        "SG", "BR", "AR", "CL", "CO", "CR", "PA", "DO", "PR",
+      ],
+    },
     line_items: [{
       quantity: 1,
       price_data: {

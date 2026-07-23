@@ -41,7 +41,8 @@ Deno.serve(async (req) => {
   const name = String(body.name ?? "").trim().slice(0, 80);
   const email = String(body.email ?? "").trim().toLowerCase().slice(0, 200);
   const password = String(body.password ?? "");
-  const role = body.role === "owner" ? "owner" : "artisan";
+  const role = ["owner", "supervisor", "artisan"].includes(String(body.role))
+    ? String(body.role) : "artisan";
   const specialty = String(body.specialty ?? "").trim().slice(0, 120);
   const color = /^#[0-9A-Fa-f]{6}$/.test(String(body.color)) ? String(body.color) : "#8A6FA8";
   const capacity = Math.min(12, Math.max(1, Number(body.capacity) || 4));

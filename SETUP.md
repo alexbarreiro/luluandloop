@@ -14,20 +14,38 @@ real backend: Stripe payments, staff logins, the worker experience, and file evi
 
 ## Steps (automated by Claude, or by hand)
 
-1. **Database** — apply `supabase/schema.sql` (SQL editor or `supabase db push`).
-   Creates: `profiles`, `orders`, `stage_reports`, `tasks`, the private `evidence`
-   storage bucket, row-level-security policies, and the order-code sequence.
-2. **Edge functions** — deploy the four functions:
+1. **Database** — apply `supabase/schema.sql`, then `supabase/schema_v2.sql`
+   (SQL editor or `supabase db push`). Before applying v2, substitute its two
+   placeholders (see the file header): `__NOTIFY_URL__` →
+   `https://<REF>.supabase.co/functions/v1/notify` and `__NOTIFY_SECRET__` →
+   a random string (`openssl rand -hex 24`) — emails silently stay off otherwise.
+   Creates: `profiles`, `orders`, `stage_reports`, `tasks`, `payouts`,
+   `customer_uploads`, the private `evidence` bucket, RLS policies, the
+   order-code sequence, and the auto-task/notification triggers.
+2. **Edge functions** — deploy all seven:
    ```bash
    supabase functions deploy create-checkout --no-verify-jwt --project-ref <REF>
    supabase functions deploy stripe-webhook --no-verify-jwt --project-ref <REF>
+   supabase functions deploy notify --no-verify-jwt --project-ref <REF>
+   supabase functions deploy customer-upload --no-verify-jwt --project-ref <REF>
+   supabase functions deploy shippo --project-ref <REF>
    supabase functions deploy create-balance-link --project-ref <REF>
    supabase functions deploy admin-create-staff --project-ref <REF>
    ```
+   (`--no-verify-jwt` endpoints are called without a user session — by Stripe,
+   pg_net triggers, or the public share link — and enforce their own auth:
+   Stripe signatures, the notify secret, or the per-order share token.)
 3. **Function secrets**:
    ```bash
-   supabase secrets set STRIPE_SECRET_KEY=sk_... SITE_URL=https://luluandloop.com --project-ref <REF>
+   supabase secrets set STRIPE_SECRET_KEY=sk_... SITE_URL=https://luluandloop.com \
+     NOTIFY_SECRET=<same value substituted into schema_v2.sql> \
+     RESEND_API_KEY=re_... \
+     SHIPPO_API_TOKEN=shippo_... \
+     SHIP_FROM='{"name":"Lulu & Loop","street1":"...","city":"Boston","state":"MA","zip":"...","country":"US","email":"hello@luluandloop.com"}' \
+     --project-ref <REF>
    ```
+   `RESEND_API_KEY` and `SHIPPO_API_TOKEN` can be added later — emails no-op and
+   shipping returns a clear "not configured" message until they exist.
 4. **Stripe webhook** — in the Stripe dashboard (or API) add an endpoint:
    `https://<REF>.supabase.co/functions/v1/stripe-webhook`
    listening to `checkout.session.completed`; copy its signing secret and:

@@ -96,6 +96,18 @@
     <div class="view" id="view-mytasks">
       <div class="task-list" id="mytask-list"></div>
     </div>
+    <div class="view" id="view-customers">
+      <div class="view-toolbar">
+        <input type="search" id="customer-search" class="search-input" placeholder="Search name, email, city…">
+      </div>
+      <div class="customer-list" id="customer-list"></div>
+    </div>
+    <div class="view" id="view-payouts">
+      <div class="toolbar-note" style="margin-bottom:16px">Artisan pay: 40% of each shipped piece. The founder keeps full profit and isn’t listed here.</div>
+      <div class="payout-grid" id="payout-grid"></div>
+      <div class="drawer-section-title" style="margin:26px 0 10px">Payout history</div>
+      <div class="payout-history" id="payout-history"></div>
+    </div>
   </main>
 
   <!-- Order drawer (owner) -->
@@ -126,9 +138,21 @@
         <div class="drawer-section-title" id="drawer-artisan-label">Assigned artisan</div>
         <select id="drawer-artisan" aria-labelledby="drawer-artisan-label"></select>
       </div>
+      <div class="drawer-section" id="drawer-shipping-section">
+        <div class="drawer-section-title">Shipping</div>
+        <div class="ship-address" id="ship-address"></div>
+        <div class="ship-rate-chosen" id="ship-rate-chosen"></div>
+        <div class="ship-rates" id="ship-rates"></div>
+        <div class="ship-actions" id="ship-actions"></div>
+        <div class="ship-tracking" id="ship-tracking"></div>
+      </div>
       <div class="drawer-section">
         <div class="drawer-section-title">Progress reports</div>
         <div class="report-list" id="drawer-reports"></div>
+      </div>
+      <div class="drawer-section" id="drawer-shares-section" hidden>
+        <div class="drawer-section-title">Shared by the customer</div>
+        <div class="report-list" id="drawer-shares"></div>
       </div>
       <div class="drawer-actions">
         <button class="btn-advance" id="drawer-advance"></button>

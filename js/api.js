@@ -31,6 +31,7 @@
 
   var DEMO_PROFILES = [
     { id: 'p-lulu', email: 'lulu@luluandloop.com', name: 'Lourdes “Lulu”', role: 'owner', specialty: 'Faces, final details & QC', color: '#E4657E', capacity: 2, active: true },
+    { id: 'p-alexb', email: 'alex@luluandloop.com', name: 'Alex', role: 'supervisor', specialty: 'Operations & shipping', color: '#3E7CB1', capacity: 4, active: true },
     { id: 'p-marisol', email: 'marisol@luluandloop.com', name: 'Marisol', role: 'artisan', specialty: 'Blankets, lace & borders', color: '#8A6FA8', capacity: 4, active: true },
     { id: 'p-carmen', email: 'carmen@luluandloop.com', name: 'Carmen', role: 'artisan', specialty: 'Amigurumi bodies & outfits', color: '#5E8B6A', capacity: 4, active: true },
     { id: 'p-yesenia', email: 'yesenia@luluandloop.com', name: 'Yesenia', role: 'artisan', specialty: 'Wearables & sizing', color: '#C08A3E', capacity: 4, active: true },
@@ -58,7 +59,7 @@
 
   function LocalStore() {
     var K = {
-      staff: 'luluandloop.demo.staff',
+      staff: 'luluandloop.demo.staff.v2',
       orders: 'luluandloop.orders',          // shared with the wizard
       overrides: 'luluandloop.studio.overrides',
       tasks: 'luluandloop.demo.tasks',
@@ -117,6 +118,9 @@
           if (typeof x.artisan_id === 'string') o.artisan_id = x.artisan_id;
           if (x.balanceSent) o.balance_sent_at = o.balance_sent_at || 'demo';
           if (x.balance_sent_at) o.balance_sent_at = x.balance_sent_at;
+          ['shipping_rate', 'tracking_number', 'label_url', 'tracking_url'].forEach(function (k2) {
+            if (k2 in x) o[k2] = x[k2];
+          });
         }
         o.deposit = Math.round(o.price * .4);
         o.balance = o.price - o.deposit;
@@ -134,6 +138,32 @@
       ov[code] = Object.assign(ov[code] || {}, patch);
       set(K.overrides, ov);
     }
+    // Demo parity with the DB trigger: auto-create content tasks on stage moves
+    function autoTasks(order, toStage) {
+      if (!order.artisan_id) return;
+      var t = tasks();
+      function addOnce(pillar, title, details, dueDays) {
+        if (t.some(function (x) { return x.order_code === order.code && x.pillar === pillar; })) return;
+        t.unshift({ id: uid(), title: title, details: details, pillar: pillar,
+          assignee_id: order.artisan_id, order_code: order.code,
+          due_date: new Date(Date.now() + dueDays * 864e5).toISOString().slice(0, 10),
+          status: 'open', evidence_note: '', evidence_link: '', evidence_name: '', evidence_data: '',
+          created_at: new Date().toISOString() });
+      }
+      if (toStage === 3) {
+        addOnce('idea-to-piece', 'Reel: ' + order.item + ' — sketch → piece',
+          'Film the WIP next to the customer’s reference. 20–30s vertical, tag #HechoConLulu.', 5);
+      }
+      if (toStage === 5) {
+        addOnce('reveal-unboxing', 'Reveal: repost ' + order.customer + '’s unboxing',
+          'When the customer shares their photo/video, ask permission and repost. Tag #HechoConLulu.', 14);
+      }
+      set(K.tasks, t);
+    }
+    var DEMO_RATES = [
+      { rate_id: 'demo-usps-p', provider: 'USPS', service: 'Priority Mail', amount: '11.85', currency: 'USD', days: 2 },
+      { rate_id: 'demo-usps-g', provider: 'USPS', service: 'Ground Advantage', amount: '8.40', currency: 'USD', days: 4 },
+      { rate_id: 'demo-ups-g', provider: 'UPS', service: 'Ground Saver', amount: '9.72', currency: 'USD', days: 5 }];
 
     return {
       mode: 'demo',
@@ -171,11 +201,16 @@
       listOrders: function () { return Promise.resolve(orders()); },
       updateOrder: function (code, patch) {
         saveOverride(code, patch);
+        if (typeof patch.stage === 'number') {
+          var o = orders().find(function (x) { return x.code === code; });
+          if (o) autoTasks(o, patch.stage);
+        }
         return Promise.resolve();
       },
       advanceStage: function (order, toStage, note, file) {
         var me = this.currentUser();
         saveOverride(order.code, { stage: toStage });
+        autoTasks(order, toStage);
         var reps = get(K.reports, []);
         var rep = { id: uid(), order_code: order.code, user_id: me ? me.id : '', user_name: me ? me.name : '',
           from_stage: order.stage, to_stage: toStage, note: note || '',
@@ -247,7 +282,30 @@
       sendBalanceLink: function (order) {
         saveOverride(order.code, { balance_sent_at: new Date().toISOString() });
         return Promise.resolve({ url: 'https://checkout.stripe.com/demo-balance-link (demo — configure Stripe to generate real links)' });
-      }
+      },
+      getShippingRates: function () { return Promise.resolve({ rates: DEMO_RATES }); },
+      chooseRate: function (order, rate) {
+        saveOverride(order.code, { shipping_rate: rate });
+        return Promise.resolve({ ok: true, rate: rate });
+      },
+      buyLabel: function (order) {
+        var tracking = '9400 demo ' + order.code.slice(-4);
+        saveOverride(order.code, { tracking_number: tracking, label_url: '', tracking_url: '' });
+        return Promise.resolve({ tracking_number: tracking, label_url: '', tracking_url: '' });
+      },
+      listPayouts: function () { return Promise.resolve(get('luluandloop.demo.payouts', [])); },
+      recordPayout: function (artisanId, amount, orderCodes) {
+        var ps = get('luluandloop.demo.payouts', []);
+        ps.unshift({ id: uid(), artisan_id: artisanId, amount: amount, order_codes: orderCodes || [],
+          created_at: new Date().toISOString() });
+        set('luluandloop.demo.payouts', ps);
+        return Promise.resolve();
+      },
+      listCustomerUploads: function (orderCode) {
+        var ups = get('luluandloop.demo.shares', []);
+        return Promise.resolve(ups.filter(function (u) { return !orderCode || u.order_code === orderCode; }));
+      },
+      customerUploadUrl: function (up) { return Promise.resolve(up.data || ''); }
     };
   }
 
@@ -337,6 +395,9 @@
           });
         }
         return upload.then(function () {
+          // same-stage "progress note" reports must not touch the stage —
+          // artisan RLS only allows stage writes into 3/4
+          if (toStage === order.stage) return { error: null };
           return sb().from('orders').update({ stage: toStage }).eq('id', order.id);
         }).then(function (r) {
           if (r.error) fail(r.error);
@@ -424,7 +485,44 @@
           .then(function (r) { return r.data ? r.data.signedUrl : ''; });
       },
       sendBalanceLink: function (order, shipping) {
-        return callFn('create-balance-link', { order_id: order.id, shipping: shipping || 0 });
+        var payload = { order_id: order.id };
+        if (shipping != null) payload.shipping = shipping;
+        return callFn('create-balance-link', payload);
+      },
+      getShippingRates: function (order) {
+        return callFn('shippo', { action: 'rates', order_id: order.id });
+      },
+      chooseRate: function (order, rate) {
+        return callFn('shippo', { action: 'choose', order_id: order.id, rate: rate });
+      },
+      buyLabel: function (order, rateId) {
+        return callFn('shippo', { action: 'buy', order_id: order.id, rate_id: rateId });
+      },
+      listPayouts: function () {
+        return sb().from('payouts').select('*').order('created_at', { ascending: false }).then(function (r) {
+          if (r.error) fail(r.error); return r.data;
+        });
+      },
+      recordPayout: function (artisanId, amount, orderCodes) {
+        return sb().from('payouts').insert({
+          artisan_id: artisanId, amount: amount, order_codes: orderCodes || [],
+          created_by: meCache ? meCache.id : null
+        }).then(function (r) { if (r.error) fail(r.error); });
+      },
+      listCustomerUploads: function () {
+        return sb().from('customer_uploads').select('*, orders(code)').order('created_at', { ascending: false })
+          .then(function (r) {
+            if (r.error) fail(r.error);
+            return r.data.map(function (u) {
+              u.order_code = u.orders ? u.orders.code : '';
+              u.name = u.file_path.split('/').pop();
+              return u;
+            });
+          });
+      },
+      customerUploadUrl: function (up) {
+        return sb().storage.from('evidence').createSignedUrl(up.file_path, 3600)
+          .then(function (r) { return r.data ? r.data.signedUrl : ''; });
       }
     };
   }

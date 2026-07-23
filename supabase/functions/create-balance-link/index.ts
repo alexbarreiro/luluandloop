@@ -37,7 +37,9 @@ Deno.serve(async (req) => {
   if (userErr || !userData?.user) return json({ error: "unauthorized" }, 401);
   const { data: profile } = await admin
     .from("profiles").select("id, role, active").eq("id", userData.user.id).single();
-  if (!profile?.active || profile.role !== "owner") return json({ error: "owner only" }, 403);
+  if (!profile?.active || (profile.role !== "owner" && profile.role !== "supervisor")) {
+    return json({ error: "managers only" }, 403);
+  }
 
   let body: Record<string, unknown>;
   try {
@@ -54,12 +56,17 @@ Deno.serve(async (req) => {
 
   const { data: order, error: ordErr } = await admin
     .from("orders")
-    .select("id, code, item, email, balance, lang, balance_paid_at")
+    .select("id, code, item, email, balance, lang, balance_paid_at, shipping_rate")
     .eq("id", orderId).single();
   if (ordErr || !order) return json({ error: "order not found" }, 404);
   if (order.balance_paid_at) return json({ error: "balance already paid" }, 409);
 
-  const total = Number(order.balance) + shipping;
+  // Default to the Shippo rate chosen in the studio when no manual amount given
+  const rateAmount = Number((order.shipping_rate as { amount?: string } | null)?.amount ?? NaN);
+  const effectiveShipping = body.shipping == null && Number.isFinite(rateAmount)
+    ? Math.round(rateAmount * 100) / 100
+    : shipping;
+  const total = Number(order.balance) + effectiveShipping;
   const lang = order.lang === "es" ? "es" : "en";
   const label = lang === "es"
     ? `Saldo 60% + envío · ${order.item} · ${order.code}`
@@ -87,7 +94,7 @@ Deno.serve(async (req) => {
     balance_url: session.url,
     balance_session_id: session.id,
     balance_sent_at: new Date().toISOString(),
-    shipping,
+    shipping: effectiveShipping,
   }).eq("id", order.id);
 
   return json({ url: session.url });

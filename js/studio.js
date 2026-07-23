@@ -15,7 +15,8 @@
   var PASS_HASH = '0f89c4839feb69124c67993c766c582abd71c3e3703e5073eae12e623ee75119';
 
   var state = { view: 'board', selected: null, me: null,
-    profiles: [], orders: [], tasks: [], reports: [] };
+    profiles: [], orders: [], tasks: [], reports: [], payouts: [], shares: [],
+    shipRates: null, customerQuery: '', highlightTask: null };
 
   function $(id) { return document.getElementById(id); }
   function fmt(n) { return '$' + Math.round(n); }
@@ -23,6 +24,7 @@
   function bal(o) { return o.price - dep(o); }
   function profile(id) { return state.profiles.find(function (p) { return p.id === id; }); }
   function isOwner() { return state.me && state.me.role === 'owner'; }
+  function isManager() { return state.me && (state.me.role === 'owner' || state.me.role === 'supervisor'); }
   function pillar(id) { return PILLARS.find(function (p) { return p.id === id; }) || PILLARS[PILLARS.length - 1]; }
   function fmtDate(iso) {
     if (!iso) return '';
@@ -48,17 +50,22 @@
 
   /* ---------- Data refresh ---------- */
   function refresh() {
-    var mine = isOwner() ? null : state.me.id;
-    return Promise.all([
+    var mine = isManager() ? null : state.me.id;
+    var loads = [
       S.listProfiles(),
       S.listOrders(),
       S.listTasks(mine),
-      S.listReports(null)
-    ]).then(function (r) {
+      S.listReports(null),
+      isOwner() ? S.listPayouts() : Promise.resolve([]),
+      isManager() ? S.listCustomerUploads().catch(function () { return []; }) : Promise.resolve([])
+    ];
+    return Promise.all(loads).then(function (r) {
       state.profiles = r[0];
       state.orders = r[1];
       state.tasks = r[2];
       state.reports = r[3];
+      state.payouts = r[4];
+      state.shares = r[5];
     }).catch(function (e) { toast('Could not load data: ' + e.message, true); });
   }
 
@@ -78,14 +85,18 @@
   /* ---------- Header / nav ---------- */
   var NAVS = {
     owner: [['board', '⬚', 'Order board'], ['team', '✿', 'Team & workload'], ['pay', '⟳', 'Payments'],
-            ['staff', '✚', 'Staff'], ['tasks', '✓', 'Tasks']],
+            ['customers', '♡', 'Customers'], ['staff', '✚', 'Staff'], ['tasks', '✓', 'Tasks'],
+            ['payouts', '◈', 'Artisan payouts']],
+    supervisor: [['board', '⬚', 'Order board'], ['team', '✿', 'Team & workload'], ['pay', '⟳', 'Payments'],
+            ['customers', '♡', 'Customers'], ['tasks', '✓', 'Tasks']],
     artisan: [['mypieces', '⬚', 'My pieces'], ['mytasks', '✓', 'My tasks']]
   };
   var TITLES = { board: 'Order board', team: 'Team & workload', pay: 'Payments',
-    staff: 'Staff', tasks: 'Tasks & content engine', mypieces: 'My pieces', mytasks: 'My tasks' };
+    staff: 'Staff', tasks: 'Tasks & content engine', mypieces: 'My pieces', mytasks: 'My tasks',
+    customers: 'Customers', payouts: 'Artisan payouts' };
 
   function renderNav() {
-    var items = NAVS[isOwner() ? 'owner' : 'artisan'];
+    var items = NAVS[state.me.role] || NAVS.artisan;
     $('side-nav').innerHTML = items.map(function (it) {
       var active = state.view === it[0] ? ' class="active"' : '';
       return '<button data-view="' + it[0] + '"' + active + '>' + it[1] + ' ' + esc(it[2]) + '</button>';
@@ -99,7 +110,8 @@
     $('side-avatar').textContent = state.me.name[0];
     $('side-avatar').style.background = state.me.color || '#E4657E';
     $('side-user-name').textContent = state.me.name;
-    $('side-user-role').textContent = (state.me.role === 'owner' ? 'Owner' : 'Artisan') +
+    var roleLabel = { owner: 'Founder', supervisor: 'Supervisor', artisan: 'Artisan' }[state.me.role] || 'Staff';
+    $('side-user-role').textContent = roleLabel +
       (state.me.specialty ? ' · ' + state.me.specialty.split(',')[0] : '');
   }
 
@@ -113,7 +125,7 @@
   /* ---------- Stats ---------- */
   function renderStats() {
     var tiles;
-    if (isOwner()) {
+    if (isManager()) {
       var orders = state.orders;
       var openCount = orders.filter(function (o) { return o.stage < 5; }).length;
       var depositsHeld = orders.filter(function (o) { return depPaid(o) && o.stage < 5 && !balPaid(o); })
@@ -165,13 +177,18 @@
         var artisan = o.artisan_id && profile(o.artisan_id)
           ? '<span class="artisan-chip" style="color:' + safeColor(profile(o.artisan_id).color) + '">' + esc(profile(o.artisan_id).name.split(' ')[0]) + '</span>'
           : '<span class="artisan-chip" style="color:#B6B1BC">＋ assign</span>';
-        return '<button type="button" class="order-card" data-code="' + esc(o.code) + '">' +
+        var quick = (isManager() && o.stage < 5)
+          ? '<button type="button" class="quick-advance" data-advance="' + esc(o.code) + '" ' +
+            'title="Advance to ' + esc(STAGES[o.stage + 1]) + '" aria-label="Advance to ' + esc(STAGES[o.stage + 1]) + '">›</button>'
+          : '';
+        return '<div class="order-card-wrap">' + quick +
+          '<button type="button" class="order-card" data-code="' + esc(o.code) + '">' +
           '<div class="order-card-top"><img src="' + esc(o.img) + '" alt="">' +
           '<div class="order-card-min"><div class="order-card-item">' + esc(o.item) + '</div>' +
           '<div class="order-card-cust">' + esc(o.customer) + ' · ' + esc(o.code.slice(-4)) + '</div></div></div>' +
           '<div class="order-card-foot"><span class="order-card-price">' + fmt(o.price) + '</span>' +
           '<span class="chip ' + pc.cls + '">' + esc(pc.label) + '</span>' +
-          (o.rush ? '<span class="rush-flag">⚡</span>' : '') + artisan + '</div></button>';
+          (o.rush ? '<span class="rush-flag">⚡</span>' : '') + artisan + '</div></button></div>';
       }).join('');
       return '<div class="board-col"><div class="board-col-head">' +
         '<span class="board-dot" style="background:' + STAGE_DOTS[i] + '"></span>' +
@@ -181,6 +198,18 @@
     }).join('');
     Array.prototype.forEach.call(document.querySelectorAll('#view-board .order-card'), function (el) {
       el.addEventListener('click', function () { openDrawer(el.getAttribute('data-code')); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('#view-board .quick-advance'), function (el) {
+      el.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var o = state.orders.find(function (x) { return x.code === el.getAttribute('data-advance'); });
+        if (!o) return;
+        el.disabled = true;
+        S.updateOrder(o.code, { stage: Math.min(5, o.stage + 1) })
+          .then(refresh).then(renderAll)
+          .then(function () { toast(o.code.slice(-4) + ' → ' + STAGES[Math.min(5, o.stage + 1)]); })
+          .catch(function (err) { el.disabled = false; toast(err.message, true); });
+      });
     });
   }
 
@@ -244,7 +273,9 @@
     $('staff-grid').innerHTML = state.profiles.map(function (p) {
       var roleChip = p.role === 'owner'
         ? '<span class="chip pinky">owner</span>'
-        : '<span class="chip soft">artisan</span>';
+        : p.role === 'supervisor'
+          ? '<span class="chip amber">supervisor</span>'
+          : '<span class="chip soft">artisan</span>';
       var activeChip = p.active ? '<span class="chip green">active</span>' : '<span class="chip mute">deactivated</span>';
       var load = state.orders.filter(function (o) { return o.artisan_id === p.id && o.stage >= 1 && o.stage < 5; }).length;
       return '<div class="team-card' + (p.active ? '' : ' inactive') + '">' +
@@ -285,7 +316,8 @@
       (isNew ? '<label>Temporary password <input id="sf-pass" type="text" required minlength="8" placeholder="min. 8 characters"><span class="field-note">Share it with them privately — they use it to sign in at /studio.</span></label>' : '') +
       '<div class="modal-two">' +
       '<label>Role <select id="sf-role"><option value="artisan"' + (p.role === 'artisan' ? ' selected' : '') + '>Artisan</option>' +
-      '<option value="owner"' + (p.role === 'owner' ? ' selected' : '') + '>Owner</option></select></label>' +
+      '<option value="supervisor"' + (p.role === 'supervisor' ? ' selected' : '') + '>Supervisor</option>' +
+      '<option value="owner"' + (p.role === 'owner' ? ' selected' : '') + '>Owner / founder</option></select></label>' +
       '<label>Capacity <input id="sf-cap" type="number" min="1" max="12" value="' + (p.capacity || 4) + '"></label>' +
       '</div>' +
       '<label>Specialty <input id="sf-spec" placeholder="Blankets, lace & borders" value="' + esc(p.specialty) + '"></label>' +
@@ -349,7 +381,7 @@
         '<button class="btn-mini approve" data-approve="' + esc(t.id) + '">Approve</button>' +
         '<button class="btn-mini reject" data-reject="' + esc(t.id) + '">Send back</button>';
     }
-    return '<div class="task-card">' +
+    return '<div class="task-card" data-task-id="' + esc(t.id) + '">' +
       '<div class="task-main">' +
       '<div class="task-title">' + esc(t.title) + '</div>' +
       '<div class="task-meta"><span class="chip pillar-' + esc(t.pillar) + '">' + esc(pi.label) + (pi.cadence ? ' · ' + pi.cadence : '') + '</span>' +
@@ -491,6 +523,125 @@
         if (slot) slot.innerHTML = fallback;
       });
     }
+  }
+
+  /* ---------- Customers (managers) ---------- */
+  function formatAddress(a) {
+    if (!a) return '';
+    return [a.line1, a.line2, [a.city, a.state, a.postal_code].filter(Boolean).join(', '), a.country]
+      .filter(Boolean).join(' · ');
+  }
+
+  function renderCustomers() {
+    var byKey = {};
+    state.orders.forEach(function (o) {
+      var key = (o.email || o.customer || '?').toLowerCase();
+      var c = byKey[key] || (byKey[key] = { name: o.customer, email: o.email || '', where: o.where_from || '',
+        address: null, shipName: '', orders: [], paid: 0 });
+      c.orders.push(o);
+      if (o.shipping_address) { c.address = o.shipping_address; c.shipName = o.shipping_name || ''; }
+      if (depPaid(o)) c.paid += dep(o);
+      if (balPaid(o)) c.paid += bal(o);
+    });
+    var q = state.customerQuery.toLowerCase();
+    var list = Object.keys(byKey).map(function (k) { return byKey[k]; })
+      .filter(function (c) {
+        if (!q) return true;
+        return (c.name + ' ' + c.email + ' ' + c.where + ' ' + formatAddress(c.address)).toLowerCase().indexOf(q) > -1;
+      })
+      .sort(function (a, b) { return b.paid - a.paid; });
+
+    $('customer-list').innerHTML = list.map(function (c, i) {
+      var ordersHtml = c.orders.map(function (o) {
+        var pc = payChip(o);
+        return '<div class="cust-order" data-open-order="' + esc(o.code) + '">' +
+          '<span class="cust-order-code">' + esc(o.code.slice(-4)) + '</span>' +
+          '<span class="cust-order-item">' + esc(o.item) + '</span>' +
+          '<span class="chip soft">' + esc(STAGES[o.stage]) + '</span>' +
+          '<span class="chip ' + pc.cls + '">' + esc(pc.label) + '</span>' +
+          '<span class="cust-order-price">' + fmt(o.price) + '</span></div>';
+      }).join('');
+      return '<div class="customer-card">' +
+        '<button type="button" class="customer-head" data-cust="' + i + '">' +
+        '<div><div class="team-name">' + esc(c.name) + '</div>' +
+        '<div class="team-role">' + esc(c.email || '—') + (c.where ? ' · ' + esc(c.where) : '') + '</div></div>' +
+        '<div class="cust-meta"><span class="chip soft">' + c.orders.length +
+        (c.orders.length === 1 ? ' order' : ' orders') + '</span>' +
+        '<span class="chip green">' + fmt(c.paid) + ' paid</span></div></button>' +
+        '<div class="customer-body" hidden>' +
+        (c.address ? '<div class="cust-address">📦 ' + esc(c.shipName || c.name) + ' — ' + esc(formatAddress(c.address)) + '</div>'
+          : '<div class="cust-address muted">No shipping address on file yet (collected at deposit checkout).</div>') +
+        ordersHtml + '</div></div>';
+    }).join('') || '<div class="empty-note">No customers yet.</div>';
+
+    Array.prototype.forEach.call(document.querySelectorAll('.customer-head'), function (b) {
+      b.addEventListener('click', function () {
+        var body = b.parentElement.querySelector('.customer-body');
+        body.hidden = !body.hidden;
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-open-order]'), function (b) {
+      b.addEventListener('click', function () { openDrawer(b.getAttribute('data-open-order')); });
+    });
+  }
+
+  /* ---------- Artisan payouts (owner) ----------
+     Business plan: artisans earn 40% of each shipped piece; the founder keeps
+     full profit (owners are excluded from this view). */
+  function renderPayouts() {
+    var artisans = state.profiles.filter(function (p) { return p.role === 'artisan'; });
+    $('payout-grid').innerHTML = artisans.map(function (a) {
+      var shipped = state.orders.filter(function (o) { return o.artisan_id === a.id && o.stage >= 5; });
+      var gross = shipped.reduce(function (s, o) { return s + Number(o.price); }, 0);
+      var share = Math.round(gross * 0.4 * 100) / 100;
+      var paidOut = state.payouts.filter(function (p) { return p.artisan_id === a.id; })
+        .reduce(function (s, p) { return s + Number(p.amount); }, 0);
+      var owed = Math.max(0, Math.round((share - paidOut) * 100) / 100);
+      var rows = shipped.slice(0, 8).map(function (o) {
+        return '<div class="cust-order"><span class="cust-order-code">' + esc(o.code.slice(-4)) + '</span>' +
+          '<span class="cust-order-item">' + esc(o.item) + '</span>' +
+          '<span class="cust-order-price">' + fmt(o.price) + ' → ' + fmt(o.price * 0.4) + '</span></div>';
+      }).join('');
+      return '<div class="team-card"><div class="team-head">' +
+        '<div class="team-avatar" style="background:' + safeColor(a.color) + '">' + esc(a.name[0]) + '</div>' +
+        '<div><div class="team-name">' + esc(a.name) + '</div>' +
+        '<div class="team-role">' + shipped.length + ' shipped · ' + fmt(gross) + ' gross</div></div>' +
+        (owed > 0 ? '<span class="chip amber team-load-chip">owed ' + fmt(owed) + '</span>'
+                  : '<span class="chip green team-load-chip">settled</span>') + '</div>' +
+        '<div class="payout-summary"><span>Their 40%: <b>' + fmt(share) + '</b></span>' +
+        '<span>Paid out: <b>' + fmt(paidOut) + '</b></span></div>' +
+        rows +
+        (owed > 0 ? '<button class="btn-primary btn-sm" style="margin-top:12px" data-payout="' + esc(a.id) +
+          '" data-amount="' + owed + '">Record payout · ' + fmt(owed) + '</button>' : '') +
+        '</div>';
+    }).join('') || '<div class="empty-note">No artisan accounts yet — Lulu (founder) keeps full profit and isn’t listed. Add artisans in Staff when the team grows.</div>';
+
+    $('payout-history').innerHTML = state.payouts.map(function (p) {
+      var who = profile(p.artisan_id);
+      return '<div class="cust-order"><span class="cust-order-item"><b>' + esc(who ? who.name : '?') + '</b></span>' +
+        '<span class="cust-order-price">' + fmt(p.amount) + '</span>' +
+        '<span class="team-role">' + esc(fmtDate(p.created_at)) + '</span></div>';
+    }).join('') || '<div class="empty-note small">No payouts recorded yet.</div>';
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-payout]'), function (b) {
+      b.addEventListener('click', function () {
+        var a = profile(b.getAttribute('data-payout'));
+        var amount = Number(b.getAttribute('data-amount'));
+        // only list the orders not already covered by earlier payouts
+        var already = {};
+        state.payouts.forEach(function (p) {
+          if (p.artisan_id === a.id) (p.order_codes || []).forEach(function (c) { already[c] = true; });
+        });
+        var shippedCodes = state.orders.filter(function (o) {
+          return o.artisan_id === a.id && o.stage >= 5 && !already[o.code];
+        }).map(function (o) { return o.code; });
+        b.disabled = true;
+        S.recordPayout(a.id, amount, shippedCodes)
+          .then(refresh).then(renderAll)
+          .then(function () { toast('Payout of ' + fmt(amount) + ' to ' + a.name + ' recorded'); })
+          .catch(function (err) { b.disabled = false; toast(err.message, true); });
+      });
+    });
   }
 
   /* ---------- My pieces (artisan) ---------- */
@@ -636,8 +787,129 @@
     var row = $('shipping-row');
     if (o.stage === 4 && !o.balance_sent_at && !balPaid(o)) {
       row.hidden = false;
-      $('drawer-balance-link').textContent = 'Send Stripe balance link · ' + fmt(bal(o)) + ' + shipping';
+      var rate = o.shipping_rate;
+      $('drawer-balance-link').textContent = rate
+        ? 'Send balance link · ' + fmt(bal(o)) + ' + $' + Number(rate.amount).toFixed(2) + ' shipping'
+        : 'Send Stripe balance link · ' + fmt(bal(o)) + ' + shipping';
+      // manual shipping input only needed when no rate was chosen
+      $('shipping-row').querySelector('label').hidden = !!rate;
     } else row.hidden = true;
+
+    renderShipping(o);
+    renderShares(o);
+  }
+
+  /* ---------- Drawer: shipping (Shippo) ---------- */
+  function renderShipping(o) {
+    var section = $('drawer-shipping-section');
+    if (!isManager() || o.stage < 3) { section.hidden = true; return; }
+    section.hidden = false;
+
+    $('ship-address').innerHTML = o.shipping_address
+      ? '📦 ' + esc(o.shipping_name || o.customer) + ' — ' + esc(formatAddress(o.shipping_address))
+      : '<span class="muted">No shipping address on file (collected at deposit checkout' +
+        (S.mode === 'demo' ? '; demo orders don’t have one — rates below are samples' : '') + ').</span>';
+
+    var chosen = o.shipping_rate;
+    $('ship-rate-chosen').innerHTML = chosen
+      ? '<span class="chip green">✓ ' + esc(chosen.provider + ' ' + (chosen.service || '')) + ' — $' +
+        esc(Number(chosen.amount).toFixed(2)) + (chosen.days ? ' · ~' + esc(chosen.days) + 'd' : '') + '</span>'
+      : '';
+
+    var ratesHtml = '';
+    if (state.shipRates && state.shipRates.orderCode === o.code) {
+      ratesHtml = state.shipRates.rates.map(function (r) {
+        return '<button type="button" class="rate-option" data-rate=\'' + esc(JSON.stringify(r)) + '\'>' +
+          '<b>' + esc(r.provider) + '</b> ' + esc(r.service || '') +
+          '<span class="rate-price">$' + esc(Number(r.amount).toFixed(2)) + (r.days ? ' · ~' + esc(r.days) + 'd' : '') + '</span></button>';
+      }).join('') || '<div class="empty-note small">No rates returned for this address.</div>';
+    }
+    $('ship-rates').innerHTML = ratesHtml;
+
+    var actions = '';
+    var trackingHtml = '';
+    if (o.tracking_number) {
+      trackingHtml = '<div class="ship-track-row">🚚 <b>' + esc(o.tracking_number) + '</b>' +
+        (o.tracking_url ? ' · <a href="' + esc(o.tracking_url) + '" target="_blank" rel="noopener">track</a>' : '') +
+        (o.label_url ? ' · <a href="' + esc(o.label_url) + '" target="_blank" rel="noopener"><b>print label ⎙</b></a>' : '') +
+        '</div>';
+      if (o.stage < 5) {
+        actions = '<button class="btn-primary btn-sm" id="btn-mark-shipped">Mark shipped 🎁 — customer gets tracking + photo request</button>';
+      }
+    } else {
+      actions = '<button class="btn-mini" id="btn-get-rates">' +
+        (state.shipRates && state.shipRates.orderCode === o.code ? 'Refresh rates' : 'Get live rates') + '</button>';
+      if (chosen && balPaid(o)) {
+        actions += '<button class="btn-primary btn-sm" id="btn-buy-label">Buy label · $' +
+          esc(Number(chosen.amount).toFixed(2)) + '</button>';
+      } else if (chosen && !balPaid(o)) {
+        actions += '<span class="field-note">Label unlocks once the balance is paid.</span>';
+      }
+    }
+    $('ship-actions').innerHTML = actions;
+    $('ship-tracking').innerHTML = trackingHtml;
+
+    var getBtn = $('btn-get-rates');
+    if (getBtn) getBtn.addEventListener('click', function () {
+      getBtn.disabled = true;
+      getBtn.textContent = 'Getting rates…';
+      S.getShippingRates(o).then(function (res) {
+        state.shipRates = { orderCode: o.code, rates: res.rates || [] };
+        renderShipping(o);
+      }).catch(function (err) { toast(err.message, true); renderShipping(o); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.rate-option'), function (b) {
+      b.addEventListener('click', function () {
+        var rate = JSON.parse(b.getAttribute('data-rate'));
+        b.disabled = true;
+        S.chooseRate(o, rate).then(refresh).then(function () {
+          state.shipRates = null;
+          renderAll();
+          toast('Rate saved — it’ll be added to the balance link');
+        }).catch(function (err) { b.disabled = false; toast(err.message, true); });
+      });
+    });
+    var buyBtn = $('btn-buy-label');
+    if (buyBtn) buyBtn.addEventListener('click', function () {
+      buyBtn.disabled = true;
+      buyBtn.textContent = 'Buying label…';
+      S.buyLabel(o, chosen ? chosen.rate_id : '').then(function (res) {
+        return refresh().then(function () {
+          renderAll();
+          toast('Label ready — print it from the drawer' + (res.tracking_number ? ' · ' + res.tracking_number : ''));
+        });
+      }).catch(function (err) { buyBtn.disabled = false; buyBtn.textContent = 'Buy label'; toast(err.message, true); });
+    });
+    var shipBtn = $('btn-mark-shipped');
+    if (shipBtn) shipBtn.addEventListener('click', function () {
+      shipBtn.disabled = true;
+      S.updateOrder(o.code, { stage: 5 }).then(refresh).then(renderAll)
+        .then(function () { toast('Shipped 🎁 — customer notified' + (S.mode === 'demo' ? ' (demo: no real email)' : '')); })
+        .catch(function (err) { shipBtn.disabled = false; toast(err.message, true); });
+    });
+  }
+
+  /* ---------- Drawer: customer shares ---------- */
+  function renderShares(o) {
+    var section = $('drawer-shares-section');
+    var mine = state.shares.filter(function (u) { return (u.order_code || '') === o.code; });
+    if (!isManager() || !mine.length) { section.hidden = true; return; }
+    section.hidden = false;
+    $('drawer-shares').innerHTML = mine.map(function (u, i) {
+      return '<div class="report-row">📎 <a href="#" data-share-view="' + i + '">' + esc(u.name || 'file') + '</a>' +
+        (u.note ? '<div class="report-note">“' + esc(u.note) + '”</div>' : '') +
+        '<div class="report-time">' + esc(fmtDate(u.created_at)) + '</div></div>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('[data-share-view]'), function (a) {
+      a.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var u = mine[Number(a.getAttribute('data-share-view'))];
+        S.customerUploadUrl(u).then(function (url) {
+          if (url) window.open(url, '_blank', 'noopener');
+          else toast('Preview unavailable', true);
+        });
+      });
+    });
   }
 
   /* ---------- Modal plumbing ---------- */
@@ -661,10 +933,11 @@
 
   /* ---------- Views ---------- */
   var VIEW_RENDER = { board: renderBoard, team: renderTeam, pay: renderPayments,
-    staff: renderStaff, tasks: renderTasks, mypieces: renderMyPieces, mytasks: renderMyTasks };
+    staff: renderStaff, tasks: renderTasks, mypieces: renderMyPieces, mytasks: renderMyTasks,
+    customers: renderCustomers, payouts: renderPayouts };
 
   function renderCurrentView() {
-    ['board', 'team', 'pay', 'staff', 'tasks', 'mypieces', 'mytasks'].forEach(function (v) {
+    ['board', 'team', 'pay', 'staff', 'tasks', 'mypieces', 'mytasks', 'customers', 'payouts'].forEach(function (v) {
       var el = $('view-' + v);
       if (el) el.classList.toggle('active', state.view === v);
     });
@@ -699,10 +972,22 @@
 
   function enter(me) {
     state.me = me;
-    state.view = isOwner() ? 'board' : 'mypieces';
+    state.view = isManager() ? 'board' : 'mypieces';
+    // Deep link from task notification emails: /studio/?task=<id>
+    var taskParam = new URLSearchParams(location.search).get('task');
+    if (taskParam) {
+      state.highlightTask = taskParam;
+      state.view = isManager() ? 'tasks' : 'mytasks';
+    }
     $('gate').hidden = true;
     $('app').hidden = false;
-    return refresh().then(renderAll);
+    return refresh().then(renderAll).then(function () {
+      if (state.highlightTask) {
+        var el = document.querySelector('.task-card[data-task-id="' + state.highlightTask + '"]');
+        if (el) { el.classList.add('highlight'); el.scrollIntoView({ block: 'center' }); }
+        state.highlightTask = null;
+      }
+    });
   }
 
   function showGate() {
@@ -808,7 +1093,9 @@
   $('drawer-balance-link').addEventListener('click', function () {
     var o = selectedOrder();
     if (!o) return;
-    var shipping = parseFloat($('shipping-input').value) || 0;
+    // With a chosen Shippo rate the server derives shipping from it;
+    // otherwise the manual input applies
+    var shipping = o.shipping_rate ? null : (parseFloat($('shipping-input').value) || 0);
     var btn = $('drawer-balance-link');
     btn.disabled = true;
     S.sendBalanceLink(o, shipping).then(function (res) {
@@ -832,6 +1119,10 @@
   });
   $('btn-add-staff').addEventListener('click', function () { openStaffModal(null); });
   $('btn-add-task').addEventListener('click', function () { openTaskModal(); });
+  $('customer-search').addEventListener('input', function (e) {
+    state.customerQuery = e.target.value;
+    renderCustomers();
+  });
 
   /* ---------- Boot ---------- */
   initGate();
