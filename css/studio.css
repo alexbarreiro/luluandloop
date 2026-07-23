@@ -60,14 +60,6 @@ aside {
 .side-view-site a { color: #BFBBB8; }
 .side-view-site a:hover { color: var(--cream); }
 
-@media (max-width: 760px) {
-  .layout { flex-direction: column; }
-  aside { width: 100%; height: auto; position: static; }
-  .side-user { margin-top: 16px; }
-  /* iOS zooms into focused fields under 16px */
-  input, textarea, select { font-size: 16px !important; }
-}
-
 /* ---------- Main ---------- */
 main { flex: 1; padding: 24px 18px 60px; min-width: 0; }
 .main-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
@@ -86,7 +78,7 @@ main { flex: 1; padding: 24px 18px 60px; min-width: 0; }
 
 /* ---------- Board ---------- */
 .board {
-  display: grid; grid-template-columns: repeat(6, minmax(205px, 1fr));
+  display: grid; grid-template-columns: repeat(5, minmax(205px, 1fr));
   gap: 12px; align-items: start; overflow-x: auto; padding-bottom: 10px;
 }
 .board-col { background: var(--column); border-radius: 16px; padding: 10px; min-height: 340px; }
@@ -511,3 +503,66 @@ main { flex: 1; padding: 24px 18px 60px; min-width: 0; }
   border: 1px solid var(--border); border-radius: 12px; background: var(--warm); color: var(--ink);
 }
 .gate-demo-note { font-size: 12px; font-weight: 700; color: var(--muted); margin-top: 14px; line-height: 1.5; }
+
+/* ---------- Mobile (kept last so it wins the cascade) ---------- */
+@media (max-width: 760px) {
+  .layout { flex-direction: column; }
+
+  /* Sidebar becomes a compact sticky top bar:
+     row 1 — brand + user/sign-out · row 2 — horizontally scrollable nav chips */
+  aside {
+    width: 100%; height: auto; position: sticky; top: 0; z-index: 40;
+    display: grid; grid-template-columns: 1fr auto; grid-template-areas: "brand user" "nav nav";
+    align-items: center; gap: 10px 12px; padding: 10px 14px;
+  }
+  .side-brand { grid-area: brand; display: flex; align-items: baseline; gap: 8px; padding: 0; min-width: 0; }
+  .side-word { font-size: 17px; white-space: nowrap; }
+  .side-tag { margin-top: 0; font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .side-nav {
+    grid-area: nav; flex-direction: row; overflow-x: auto; margin-top: 0; gap: 6px;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .side-nav::-webkit-scrollbar { display: none; }
+  .side-nav button { white-space: nowrap; flex-shrink: 0; padding: 9px 13px; font-size: 12.5px; }
+  .side-user {
+    grid-area: user; margin-top: 0; padding: 0; background: none;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .side-user-label, .side-user-role { display: none; }
+  .side-user-row { margin-top: 0; }
+  .side-user-row > div:not(.side-avatar) { display: none; } /* avatar only */
+  .side-avatar { width: 30px; height: 30px; font-size: 13px; }
+  .side-signout { width: auto; margin-top: 0; padding: 8px 12px; font-size: 11.5px; }
+  .side-view-site { display: none; }
+
+  main { padding: 16px 12px 70px; }
+  .main-head { gap: 8px 12px; }
+  .main-head h1 { font-size: 21px; }
+  .date-chip { font-size: 11px; padding: 5px 10px; }
+  .head-note { margin-left: 0; width: 100%; font-size: 11px; }
+
+  .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 14px 0 18px; }
+  .stat-tile { padding: 12px 13px; }
+  .stat-value { font-size: 21px; }
+  .stat-label { font-size: 10.5px; }
+
+  /* Board: comfortable fixed-width columns swiped horizontally */
+  .board { grid-template-columns: repeat(5, 250px); gap: 10px; scroll-snap-type: x proximity; }
+  .board-col { scroll-snap-align: start; min-height: 220px; }
+
+  .team-grid, .staff-grid, .payout-grid, .piece-grid { grid-template-columns: 1fr; }
+  .customer-head { padding: 13px 14px; }
+  .customer-body { padding: 0 14px 14px; }
+  .task-card { padding: 13px 14px; gap: 10px; }
+  .view-toolbar { gap: 10px; }
+  .search-input { width: 100%; }
+  .toolbar-note { font-size: 11.5px; }
+
+  .drawer { padding: 20px 16px; }
+  .modal { padding: 18px 16px; max-height: 92vh; }
+  .modal-two { grid-template-columns: 1fr; }
+  .shipping-row .btn-balance-link { flex-basis: 100%; }
+
+  /* iOS zooms into focused fields under 16px */
+  input, textarea, select { font-size: 16px !important; }
+}
