@@ -171,6 +171,50 @@ Deno.serve(async (req) => {
   const order = await loadOrder(code, token, email);
   if (!order) return json({ error: "order not found — check your link or sign in" }, 403);
 
+  // ---- pay balance without leaving the site (embedded Stripe Checkout) ----
+  // Creates the session at payment time; the webhook's existing kind=balance
+  // handling completes the order exactly as with emailed hosted links.
+  if (action === "pay-balance") {
+    if (order.balance_paid_at) return json({ error: "balance already paid" }, 409);
+    if (order.stage < 3) return json({ error: "your piece isn't ready for the balance yet" }, 409);
+    const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+    if (!STRIPE_KEY) return json({ error: "payments not configured" }, 501);
+    const { default: Stripe } = await import("npm:stripe@14");
+    const stripe = new Stripe(STRIPE_KEY, { apiVersion: "2023-10-16" });
+    // shipping precedence mirrors create-balance-link
+    const rateAmount = Number((order.shipping_rate as { amount?: string } | null)?.amount ?? NaN);
+    let ship: number;
+    if (order.shipping_waived) ship = 0;
+    else if (order.shipping != null) ship = Number(order.shipping);
+    else if (Number.isFinite(rateAmount)) ship = Math.round(rateAmount * 100) / 100;
+    else ship = 0;
+    const total = Number(order.balance) + ship;
+    const es = order.lang === "es";
+    const SITE_URL = Deno.env.get("SITE_URL") ?? "https://luluandloop.com";
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      ui_mode: "embedded",
+      payment_method_types: ["card"],
+      customer_email: String(order.email ?? "") || undefined,
+      line_items: [{
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: Math.round(total * 100),
+          product_data: {
+            name: es
+              ? `Saldo 60% + envío · ${order.item} · ${order.code}`
+              : `60% balance + shipping · ${order.item} · ${order.code}`,
+          },
+        },
+      }],
+      metadata: { kind: "balance", order_id: String(order.id), code: String(order.code) },
+      locale: es ? "es" : "en",
+      return_url: `${SITE_URL}/thanks/?kind=balance&code=${encodeURIComponent(String(order.code))}&lang=${es ? "es" : "en"}`,
+    });
+    return json({ client_secret: session.client_secret, total });
+  }
+
   if (action === "get") {
     const { data: review } = await admin.from("reviews")
       .select("rating, body, created_at").eq("order_id", order.id).maybeSingle();

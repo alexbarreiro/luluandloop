@@ -11,46 +11,46 @@
       ben: 'Dolls, animals & characters crocheted from your photos, sketches or wildest ideas.',
       bes: 'Muñecos, animales y personajes tejidos a partir de tus fotos, bocetos o ideas.',
       sizes: [
-        { en: 'Mini', es: 'Mini', dim: '4in / 10cm', p: 45, wk: [1, 2] },
-        { en: 'Small', es: 'Chico', dim: '6in / 15cm', p: 65, wk: [1, 2] },
-        { en: 'Classic', es: 'Clásico', dim: '10in / 25cm', p: 95, wk: [2, 3] },
-        { en: 'Grand', es: 'Grande', dim: '14in / 35cm', p: 140, wk: [3, 4] },
-        { en: 'Showpiece', es: 'Gigante', dim: '20in / 50cm', p: 220, wk: [4, 6] }] },
+        { en: 'Mini', es: 'Mini', dim: '4in / 10cm', p: 55, wk: [1, 2] },
+        { en: 'Small', es: 'Chico', dim: '6in / 15cm', p: 85, wk: [1, 2] },
+        { en: 'Classic', es: 'Clásico', dim: '10in / 25cm', p: 125, wk: [2, 3] },
+        { en: 'Grand', es: 'Grande', dim: '14in / 35cm', p: 185, wk: [3, 4] },
+        { en: 'Showpiece', es: 'Gigante', dim: '20in / 50cm', p: 295, wk: [4, 6] }] },
     { id: 'blankets', num: '02', img: '/assets/blanket-yellow.jpg', en: 'Heirloom Blankets', es: 'Cobijas de herencia',
       ben: 'Baby & keepsake blankets with lace borders, flowers and appliqués — made to be passed down.',
       bes: 'Cobijas de bebé y de recuerdo con orillas de encaje, flores y apliques — hechas para heredarse.',
       sizes: [
-        { en: 'Lovey', es: 'Apego', dim: '12×12in', p: 55, wk: [1, 2] },
-        { en: 'Stroller', es: 'Carriola', dim: '30×36in', p: 165, wk: [3, 4] },
-        { en: 'Crib', es: 'Cuna', dim: '36×48in', p: 240, wk: [4, 6] },
-        { en: 'Throw', es: 'Sofá', dim: '50×60in', p: 340, wk: [6, 8] }] },
+        { en: 'Lovey', es: 'Apego', dim: '12×12in', p: 68, wk: [1, 2] },
+        { en: 'Stroller', es: 'Carriola', dim: '30×36in', p: 185, wk: [3, 4] },
+        { en: 'Crib', es: 'Cuna', dim: '36×48in', p: 265, wk: [4, 6] },
+        { en: 'Throw', es: 'Sofá', dim: '50×60in', p: 365, wk: [6, 8] }] },
     { id: 'baby', num: '03', img: '/assets/cat-baby.jpg', en: 'Baby Sets', es: 'Sets de bebé',
       ben: 'Booties, bonnets and rattles for arrivals, baptisms and first photos.',
       bes: 'Zapatitos, gorritos y sonajas para recién nacidos, bautizos y primeras fotos.',
       sizes: [
-        { en: 'Booties + bonnet', es: 'Zapatitos + gorrito', dim: '0–12m', p: 48, wk: [1, 2] },
-        { en: 'Set + rattle', es: 'Set + sonaja', dim: '0–12m', p: 68, wk: [1, 2] },
-        { en: 'Full layette', es: 'Ajuar completo', dim: '5 pieces', p: 120, wk: [2, 3] }] },
+        { en: 'Booties + bonnet', es: 'Zapatitos + gorrito', dim: '0–12m', p: 58, wk: [1, 2] },
+        { en: 'Set + rattle', es: 'Set + sonaja', dim: '0–12m', p: 80, wk: [1, 2] },
+        { en: 'Full layette', es: 'Ajuar completo', dim: '5 pieces', p: 145, wk: [2, 3] }] },
     { id: 'wear', num: '04', img: '/assets/cat-wear.jpg', en: 'Wearables', es: 'Para vestir',
       ben: 'Beanies, scarves and little cardigans in your colors — sized to the person.',
       bes: 'Gorros, bufandas y cárdigans en tus colores — a la medida de la persona.',
       sizes: [
-        { en: 'Beanie', es: 'Gorro', dim: 'baby–adult', p: 42, wk: [1, 2] },
-        { en: 'Scarf', es: 'Bufanda', dim: '60in', p: 75, wk: [2, 3] },
-        { en: 'Kids cardigan', es: 'Cárdigan infantil', dim: '1–8y', p: 110, wk: [3, 4] }] },
+        { en: 'Beanie', es: 'Gorro', dim: 'baby–adult', p: 48, wk: [1, 2] },
+        { en: 'Scarf', es: 'Bufanda', dim: '60in', p: 85, wk: [2, 3] },
+        { en: 'Kids cardigan', es: 'Cárdigan infantil', dim: '1–8y', p: 130, wk: [3, 4] }] },
     { id: 'minis', num: '05', img: '/assets/cat-minis.jpg', en: 'Minis & Charms', es: 'Minis y llaveros',
       ben: 'Keychains and pocket-size minis — party favors, bag charms, tiny gifts.',
       bes: 'Llaveros y minis de bolsillo — recuerdos de fiesta, dijes, regalitos.',
       sizes: [
-        { en: 'Single charm', es: 'Llavero', dim: '2.5in', p: 18, wk: [1, 1] },
-        { en: 'Trio', es: 'Trío', dim: '2.5in ×3', p: 45, wk: [1, 2] },
-        { en: 'Party set (10)', es: 'Set fiesta (10)', dim: '2.5in ×10', p: 130, wk: [2, 3] }] },
+        { en: 'Single charm', es: 'Llavero', dim: '2.5in', p: 24, wk: [1, 1] },
+        { en: 'Trio', es: 'Trío', dim: '2.5in ×3', p: 60, wk: [1, 2] },
+        { en: 'Party set (10)', es: 'Set fiesta (10)', dim: '2.5in ×10', p: 165, wk: [2, 3] }] },
     { id: 'home', num: '06', img: '/assets/cat-home.jpg', en: 'Home & Decor', es: 'Hogar y decoración',
       ben: 'Pillows, garlands and wall pieces that make a room feel yours.',
       bes: 'Cojines, guirnaldas y piezas de pared que hacen tuyo un espacio.',
       sizes: [
-        { en: 'Pillow', es: 'Cojín', dim: '16×16in', p: 85, wk: [2, 3] },
-        { en: 'Garland', es: 'Guirnalda', dim: '6ft', p: 70, wk: [2, 3] },
+        { en: 'Pillow', es: 'Cojín', dim: '16×16in', p: 115, wk: [2, 3] },
+        { en: 'Garland', es: 'Guirnalda', dim: '6ft', p: 80, wk: [2, 3] },
         { en: 'Wall piece', es: 'Pieza de pared', dim: 'up to 20in', p: 95, wk: [3, 4] }] }];
 
   /* ---------- Bilingual strings ---------- */
@@ -65,7 +65,7 @@
     galNote: 'Every piece here began as someone’s photo, sketch or memory. Yours is next.',
     priceEyebrow: 'Categories & pricing', priceTitle: 'What we make',
     priceSub: 'Every piece is quoted from a base size price — final quote confirmed before you pay anything. Crochet can’t be machine-made: every stitch below is by hand.',
-    priceNote1: '⚡ Rush (−40% time): +25%', priceNote2: '📦 Shipping quoted at checkout', priceNote3: '💳 40% deposit · balance when it ships',
+    priceNote1: '⚡ Rush (−40% time): +30%', priceNote2: '📦 Shipping quoted at checkout', priceNote3: '💳 40% deposit · balance when it ships',
     storyChip: 'Est. in México · Grown in Boston', storyEyebrow: 'Our story', storyTitle: 'Three countries, one thread',
     storyP1: 'Lourdes — Lulu to everyone who loves her — learned to crochet as a girl in Cuba, where a skein of yarn was worth more than gold and nothing ever went to waste.',
     storyP2: 'In México she turned the craft into a company, teaching a small circle of artisans that a toy stitched by hand carries something a factory can never copy.',
@@ -87,7 +87,7 @@
     micHint: 'Listening… describe your piece',
     fColors: 'Colors', fColorsPh: 'dusty pink, cream, sage…', fRef: 'Reference', fRefPh: 'Drop a photo or sketch',
     optional: '(optional)', fName: 'Your name', fEmail: 'Email',
-    fRush: '⚡ Rush my piece', fRushSub: '+25% · jumps the queue, −40% wait',
+    fRush: '⚡ Rush my piece', fRushSub: '+30% · jumps the queue, −40% wait',
     estTitle: 'Your estimate', qBase: 'Base price', qRush: 'Rush — jumps the queue', qTotal: 'Total',
     turnLabel: 'Estimated time', contBtn: 'Continue to deposit', contHint: 'Describe your idea to continue',
     estNote: 'You only pay the deposit today. Lulu confirms your final quote within 24h — if anything changes, you approve it first.',
@@ -139,7 +139,7 @@
     galNote: 'Cada pieza aquí empezó como la foto, el boceto o el recuerdo de alguien. La tuya sigue.',
     priceEyebrow: 'Categorías y precios', priceTitle: 'Lo que hacemos',
     priceSub: 'Cada pieza se cotiza desde un precio base por tamaño — la cotización final se confirma antes de pagar. El crochet no se puede hacer a máquina: cada puntada es a mano.',
-    priceNote1: '⚡ Urgente (−40% tiempo): +25%', priceNote2: '📦 Envío se cotiza al pagar', priceNote3: '💳 40% anticipo · resto al enviar',
+    priceNote1: '⚡ Urgente (−40% tiempo): +30%', priceNote2: '📦 Envío se cotiza al pagar', priceNote3: '💳 40% anticipo · resto al enviar',
     storyChip: 'Nació en México · Creció en Boston', storyEyebrow: 'Nuestra historia', storyTitle: 'Tres países, un mismo hilo',
     storyP1: 'Lourdes — Lulu para quien la quiere — aprendió a tejer de niña en Cuba, donde una madeja de estambre valía oro y nada se desperdiciaba.',
     storyP2: 'En México convirtió el oficio en una empresa, enseñando a un pequeño círculo de artesanas que un juguete tejido a mano lleva algo que ninguna fábrica puede copiar.',
@@ -161,7 +161,7 @@
     micHint: 'Escuchando… describe tu pieza',
     fColors: 'Colores', fColorsPh: 'rosa viejo, crema, salvia…', fRef: 'Referencia', fRefPh: 'Sube una foto o boceto',
     optional: '(opcional)', fName: 'Tu nombre', fEmail: 'Correo',
-    fRush: '⚡ Pieza urgente', fRushSub: '+25% · se adelanta en la fila, −40% de espera',
+    fRush: '⚡ Pieza urgente', fRushSub: '+30% · se adelanta en la fila, −40% de espera',
     estTitle: 'Tu estimado', qBase: 'Precio base', qRush: 'Urgente — se adelanta', qTotal: 'Total',
     turnLabel: 'Tiempo estimado', contBtn: 'Continuar al anticipo', contHint: 'Describe tu idea para continuar',
     estNote: 'Hoy solo pagas el anticipo. Lulu confirma tu cotización final en 24h — si algo cambia, tú lo apruebas primero.',
@@ -275,7 +275,7 @@
     var cat = CATS.find(function (c) { return c.id === f.cat; }) || CATS[0];
     var sz = cat.sizes[Math.min(f.size, cat.sizes.length - 1)];
     var base = sz.p;
-    var rush = f.rush ? Math.round(base * 0.25) : 0;
+    var rush = f.rush ? Math.round(base * 0.30) : 0;
     var total = base + rush;
     var deposit = Math.round(total * DEPOSIT_PCT / 100);
     var balance = total - deposit;
@@ -581,6 +581,38 @@
   }
 
   /* ---------- Events ---------- */
+  /* ---------- Embedded Stripe Checkout (stays on our site) ---------- */
+  var stripeJsLoading = null;
+  function loadStripeJs() {
+    if (window.Stripe) return Promise.resolve();
+    if (stripeJsLoading) return stripeJsLoading;
+    stripeJsLoading = new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = 'https://js.stripe.com/v3/';
+      sc.onload = resolve;
+      sc.onerror = function () { stripeJsLoading = null; reject(new Error('stripe.js failed to load')); };
+      document.head.appendChild(sc);
+    });
+    return stripeJsLoading;
+  }
+  var embeddedCheckout = null;
+  function openEmbeddedCheckout(clientSecret) {
+    return loadStripeJs().then(function () {
+      var stripe = window.Stripe(window.LULU_CONFIG.STRIPE_PK);
+      return stripe.initEmbeddedCheckout({ clientSecret: clientSecret });
+    }).then(function (checkout) {
+      embeddedCheckout = checkout;
+      $('stripe-modal').hidden = false;
+      document.body.style.overflow = 'hidden';
+      checkout.mount('#stripe-mount');
+    });
+  }
+  function closeEmbeddedCheckout() {
+    if (embeddedCheckout) { try { embeddedCheckout.destroy(); } catch (e) { /* ignore */ } embeddedCheckout = null; }
+    $('stripe-modal').hidden = true;
+    document.body.style.overflow = '';
+  }
+
   function bind() {
     $('lang-en').addEventListener('click', function () { setLang('en'); });
     $('lang-es').addEventListener('click', function () { setLang('es'); });
@@ -609,6 +641,9 @@
     $('back-home').addEventListener('click', function () { location.hash = ''; });
 
     $('f-desc').addEventListener('input', function (e) { state.form.desc = e.target.value; renderSummary(); });
+
+    var stripeClose = $('stripe-close');
+    if (stripeClose) stripeClose.addEventListener('click', closeEmbeddedCheckout);
 
     /* ---- Dictation (Web Speech API) ---- */
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -739,10 +774,17 @@
           desc: state.form.desc.trim(),
           concept_path: state.conceptPath || undefined,
           colors: composedColors() || '—',
-          lang: state.lang
+          lang: state.lang,
+          embedded: !!(window.LULU_CONFIG && window.LULU_CONFIG.STRIPE_PK)
         }).then(function (res) {
-          location.href = res.url; // Stripe-hosted checkout page
+          if (res.client_secret) {
+            state.paying = false;
+            renderCheckout();
+            return openEmbeddedCheckout(res.client_secret); // checkout opens on OUR page
+          }
+          location.href = res.url; // fallback: Stripe-hosted page
         }).catch(function () {
+          closeEmbeddedCheckout();
           state.paying = false;
           state.checkoutHint = 'error';
           renderCheckout();

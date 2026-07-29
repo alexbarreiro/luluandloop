@@ -18,31 +18,31 @@ const SITE_URL = Deno.env.get("SITE_URL") ?? "https://luluandloop.com";
 type Size = { en: string; es: string; dim: string; p: number };
 const CATALOG: Record<string, { en: string; es: string; img: string; sizes: Size[] }> = {
   dolls: { en: "Custom Companions", es: "Compañeros a medida", img: "/assets/doll-blonde.jpg", sizes: [
-    { en: "Mini", es: "Mini", dim: "4in / 10cm", p: 45 },
-    { en: "Small", es: "Chico", dim: "6in / 15cm", p: 65 },
-    { en: "Classic", es: "Clásico", dim: "10in / 25cm", p: 95 },
-    { en: "Grand", es: "Grande", dim: "14in / 35cm", p: 140 },
-    { en: "Showpiece", es: "Gigante", dim: "20in / 50cm", p: 220 }] },
+    { en: "Mini", es: "Mini", dim: "4in / 10cm", p: 55 },
+    { en: "Small", es: "Chico", dim: "6in / 15cm", p: 85 },
+    { en: "Classic", es: "Clásico", dim: "10in / 25cm", p: 125 },
+    { en: "Grand", es: "Grande", dim: "14in / 35cm", p: 185 },
+    { en: "Showpiece", es: "Gigante", dim: "20in / 50cm", p: 295 }] },
   blankets: { en: "Heirloom Blankets", es: "Cobijas de herencia", img: "/assets/blanket-yellow.jpg", sizes: [
-    { en: "Lovey", es: "Apego", dim: "12×12in", p: 55 },
-    { en: "Stroller", es: "Carriola", dim: "30×36in", p: 165 },
-    { en: "Crib", es: "Cuna", dim: "36×48in", p: 240 },
-    { en: "Throw", es: "Sofá", dim: "50×60in", p: 340 }] },
+    { en: "Lovey", es: "Apego", dim: "12×12in", p: 68 },
+    { en: "Stroller", es: "Carriola", dim: "30×36in", p: 185 },
+    { en: "Crib", es: "Cuna", dim: "36×48in", p: 265 },
+    { en: "Throw", es: "Sofá", dim: "50×60in", p: 365 }] },
   baby: { en: "Baby Sets", es: "Sets de bebé", img: "/assets/cat-baby.jpg", sizes: [
-    { en: "Booties + bonnet", es: "Zapatitos + gorrito", dim: "0–12m", p: 48 },
-    { en: "Set + rattle", es: "Set + sonaja", dim: "0–12m", p: 68 },
-    { en: "Full layette", es: "Ajuar completo", dim: "5 pieces", p: 120 }] },
+    { en: "Booties + bonnet", es: "Zapatitos + gorrito", dim: "0–12m", p: 58 },
+    { en: "Set + rattle", es: "Set + sonaja", dim: "0–12m", p: 80 },
+    { en: "Full layette", es: "Ajuar completo", dim: "5 pieces", p: 145 }] },
   wear: { en: "Wearables", es: "Para vestir", img: "/assets/cat-wear.jpg", sizes: [
-    { en: "Beanie", es: "Gorro", dim: "baby–adult", p: 42 },
-    { en: "Scarf", es: "Bufanda", dim: "60in", p: 75 },
-    { en: "Kids cardigan", es: "Cárdigan infantil", dim: "1–8y", p: 110 }] },
+    { en: "Beanie", es: "Gorro", dim: "baby–adult", p: 48 },
+    { en: "Scarf", es: "Bufanda", dim: "60in", p: 85 },
+    { en: "Kids cardigan", es: "Cárdigan infantil", dim: "1–8y", p: 130 }] },
   minis: { en: "Minis & Charms", es: "Minis y llaveros", img: "/assets/cat-minis.jpg", sizes: [
-    { en: "Single charm", es: "Llavero", dim: "2.5in", p: 18 },
-    { en: "Trio", es: "Trío", dim: "2.5in ×3", p: 45 },
-    { en: "Party set (10)", es: "Set fiesta (10)", dim: "2.5in ×10", p: 130 }] },
+    { en: "Single charm", es: "Llavero", dim: "2.5in", p: 24 },
+    { en: "Trio", es: "Trío", dim: "2.5in ×3", p: 60 },
+    { en: "Party set (10)", es: "Set fiesta (10)", dim: "2.5in ×10", p: 165 }] },
   home: { en: "Home & Decor", es: "Hogar y decoración", img: "/assets/cat-home.jpg", sizes: [
-    { en: "Pillow", es: "Cojín", dim: "16×16in", p: 85 },
-    { en: "Garland", es: "Guirnalda", dim: "6ft", p: 70 },
+    { en: "Pillow", es: "Cojín", dim: "16×16in", p: 115 },
+    { en: "Garland", es: "Guirnalda", dim: "6ft", p: 80 },
     { en: "Wall piece", es: "Pieza de pared", dim: "up to 20in", p: 95 }] },
 };
 
@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
   const size = Number.isInteger(sizeIdx) ? cat.sizes[sizeIdx] : undefined;
   if (!size) return bad("unknown size");
   const base = size.p;
-  const price = rush ? base + Math.round(base * 0.25) : base;
+  const price = rush ? base + Math.round(base * 0.30) : base;
   const deposit = Math.round(price * 0.4);
   const balance = price - deposit;
   const item = `${cat.en} · ${size.en}`;
@@ -115,8 +115,13 @@ Deno.serve(async (req) => {
     ? `Anticipo 40% · ${cat.es} · ${size.es} · ${code}`
     : `40% deposit · ${item} · ${code}`;
 
+  // Embedded mode keeps the customer on luluandloop.com (Stripe renders inside
+  // our page); hosted redirect remains the fallback when the publishable key
+  // isn't configured on the front end
+  const embedded = body.embedded === true;
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
+    ...(embedded ? { ui_mode: "embedded" as const } : {}),
     payment_method_types: ["card"],
     customer_email: email,
     // Collect the shipping address up front so the studio can quote real
@@ -143,13 +148,19 @@ Deno.serve(async (req) => {
     }],
     metadata: { kind: "deposit", order_id: order.id, code, rush: String(rush) },
     locale: lang === "es" ? "es" : "en",
-    success_url: `${SITE_URL}/thanks/?kind=deposit&code=${encodeURIComponent(code)}&lang=${lang === "es" ? "es" : "en"}`,
-    cancel_url: `${SITE_URL}/?canceled=1#order`,
+    ...(embedded
+      ? { return_url: `${SITE_URL}/thanks/?kind=deposit&code=${encodeURIComponent(code)}&lang=${lang === "es" ? "es" : "en"}` }
+      : {
+        success_url: `${SITE_URL}/thanks/?kind=deposit&code=${encodeURIComponent(code)}&lang=${lang === "es" ? "es" : "en"}`,
+        cancel_url: `${SITE_URL}/?canceled=1#order`,
+      }),
   });
 
   await supabase.from("orders").update({ deposit_session_id: session.id }).eq("id", order.id);
 
-  return new Response(JSON.stringify({ url: session.url, code }), {
+  return new Response(JSON.stringify(
+    embedded ? { client_secret: session.client_secret, code } : { url: session.url, code },
+  ), {
     headers: { ...CORS, "Content-Type": "application/json" },
   });
 });

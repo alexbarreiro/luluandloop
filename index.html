@@ -93,7 +93,7 @@
     <p class="pricing-sub" data-i18n="priceSub">Every piece is quoted from a base size price — final quote confirmed before you pay anything. Crochet can’t be machine-made: every stitch below is by hand.</p>
     <div class="pricing-grid" id="pricing-grid"></div>
     <div class="price-notes">
-      <span data-i18n="priceNote1">⚡ Rush (−40% time): +25%</span>
+      <span data-i18n="priceNote1">⚡ Rush (−40% time): +30%</span>
       <span data-i18n="priceNote2">📦 Shipping quoted at checkout</span>
       <span data-i18n="priceNote3">💳 40% deposit · balance when it ships</span>
     </div>
@@ -199,7 +199,7 @@
             </div>
             <label class="rush-row">
               <input type="checkbox" id="f-rush">
-              <span class="rush-label"><span data-i18n="fRush">⚡ Rush my piece</span> <span class="sub" data-i18n="fRushSub">+25% · jumps the queue, −40% wait</span></span>
+              <span class="rush-label"><span data-i18n="fRush">⚡ Rush my piece</span> <span class="sub" data-i18n="fRushSub">+30% · jumps the queue, −40% wait</span></span>
             </label>
           </div>
         </div>
@@ -292,6 +292,14 @@
         <div class="summary-note" style="text-align:center;margin-top:14px" data-i18n="portalHint">Your confirmation email has a magic link — or create an account with the same email to see all your pieces.</div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Embedded Stripe Checkout (stays on luluandloop.com) -->
+<div id="stripe-modal" hidden>
+  <div class="stripe-box">
+    <button id="stripe-close" aria-label="Close checkout">✕</button>
+    <div id="stripe-mount"></div>
   </div>
 </div>
 

@@ -86,6 +86,18 @@
     body.print-invoice .wrap { display:none; }
     body.print-invoice #invoice { display:block; padding:40px; box-sizing:border-box; }
   }
+  #stripe-modal { position:fixed; inset:0; z-index:200; background:rgba(42,42,51,.55);
+    display:flex; align-items:center; justify-content:center; padding:18px; }
+  .stripe-box { position:relative; background:#fff; border-radius:18px; width:min(480px,100%);
+    max-height:92vh; overflow-y:auto; padding:14px; box-sizing:border-box; }
+  #stripe-close { position:absolute; top:10px; right:10px; z-index:2; border:1px solid var(--border);
+    background:var(--card); border-radius:50%; width:32px; height:32px; cursor:pointer;
+    font-size:14px; color:var(--muted); line-height:1; }
+  #stripe-mount { min-height:420px; }
+  @media (max-width:560px) {
+    #stripe-modal { padding:0; align-items:stretch; }
+    .stripe-box { width:100%; max-height:100vh; border-radius:0; }
+  }
   [hidden] { display:none !important; }
 </style>
 </head>
@@ -199,6 +211,13 @@
 </div>
 
 <div id="invoice"></div>
+
+<div id="stripe-modal" hidden>
+  <div class="stripe-box">
+    <button id="stripe-close" aria-label="Close checkout">✕</button>
+    <div id="stripe-mount"></div>
+  </div>
+</div>
 
 <script src="/js/config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -349,7 +368,13 @@
       if (o.balance_url && !o.balance_paid_at) {
         pb.style.display = 'block';
         pb.textContent = t().pay + ' · $' + (Number(o.balance) + (Number(o.shipping) || 0));
-        pb.href = o.balance_url;
+        if (window.LULU_CONFIG && window.LULU_CONFIG.STRIPE_PK) {
+          pb.removeAttribute('href');           // pay without leaving the site
+          pb.onclick = function (ev) { ev.preventDefault(); payBalanceEmbedded(); };
+        } else {
+          pb.href = o.balance_url;              // fallback: Stripe-hosted page
+          pb.onclick = null;
+        }
       } else pb.style.display = 'none';
     } else $('approval-card').hidden = true;
 
@@ -382,7 +407,7 @@
       '<div style="font-size:12px;color:#777">luluandloop.com · hello@luluandloop.com · Boston, MA</div>' +
       '<hr><h3>' + (lang === 'es' ? 'Factura · ' : 'Invoice · ') + esc(o.code) + '</h3>' +
       '<div>' + esc(o.customer || '') + '</div>' +
-      '<div style="margin:6px 0 14px">' + esc(o.item) + ' · ' + esc(o.size_label || '') + (o.rush ? ' · rush +25%' : '') + '</div>' +
+      '<div style="margin:6px 0 14px">' + esc(o.item) + ' · ' + esc(o.size_label || '') + (o.rush ? ' · rush +30%' : '') + '</div>' +
       '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
       '<tr><td style="padding:6px;border-bottom:1px solid #ddd">' + (lang === 'es' ? 'Total de la pieza' : 'Piece total') + '</td><td style="text-align:right;border-bottom:1px solid #ddd">$' + o.price + '</td></tr>' +
       '<tr><td style="padding:6px;border-bottom:1px solid #ddd">' + (lang === 'es' ? 'Anticipo pagado' : 'Deposit paid') + (o.deposit_paid_at ? ' (' + String(o.deposit_paid_at).slice(0, 10) + ')' : '') + '</td><td style="text-align:right;border-bottom:1px solid #ddd">$' + o.deposit + '</td></tr>' +
@@ -636,6 +661,50 @@
       setTimeout(function () { $('pf-pass-save').textContent = t().pfPassSave; }, 2000);
     });
   });
+
+  /* ---------- Embedded Stripe Checkout (stays on our site) ---------- */
+  var stripeJsLoading = null, embeddedCheckout = null;
+  function loadStripeJs() {
+    if (window.Stripe) return Promise.resolve();
+    if (stripeJsLoading) return stripeJsLoading;
+    stripeJsLoading = new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = 'https://js.stripe.com/v3/';
+      sc.onload = resolve;
+      sc.onerror = function () { stripeJsLoading = null; reject(new Error('stripe.js failed to load')); };
+      document.head.appendChild(sc);
+    });
+    return stripeJsLoading;
+  }
+  function closeEmbeddedCheckout() {
+    if (embeddedCheckout) { try { embeddedCheckout.destroy(); } catch (e) { /* ignore */ } embeddedCheckout = null; }
+    $('stripe-modal').hidden = true;
+    document.body.style.overflow = '';
+  }
+  function payBalanceEmbedded() {
+    var pb = $('btn-pay-balance');
+    pb.style.opacity = '.6';
+    portal({ action: 'pay-balance', code: state.order.code, token: token || '' })
+      .then(function (res) {
+        if (!res.client_secret) throw new Error(res.error || 'payment unavailable');
+        return loadStripeJs().then(function () {
+          var stripe = window.Stripe(window.LULU_CONFIG.STRIPE_PK);
+          return stripe.initEmbeddedCheckout({ clientSecret: res.client_secret });
+        });
+      })
+      .then(function (checkout) {
+        embeddedCheckout = checkout;
+        $('stripe-modal').hidden = false;
+        document.body.style.overflow = 'hidden';
+        checkout.mount('#stripe-mount');
+        pb.style.opacity = '';
+      })
+      .catch(function (e) {
+        pb.style.opacity = '';
+        $('ap-err').textContent = e.message;
+      });
+  }
+  $('stripe-close').addEventListener('click', closeEmbeddedCheckout);
 
   /* ---------- boot ---------- */
   applyLabels();

@@ -992,7 +992,7 @@
     $('drawer-chips').innerHTML =
       '<span class="tag">' + esc(o.size_label || '—') + '</span>' +
       '<span class="tag">🎨 ' + esc(o.colors || '—') + '</span>' +
-      (o.rush ? '<span class="tag rush">⚡ rush +25%</span>' : '');
+      (o.rush ? '<span class="tag rush">⚡ rush +30%</span>' : '');
     $('drawer-price').textContent = fmt(o.price);
     $('drawer-dep').innerHTML = depPaid(o)
       ? '<span class="chip green">✓ paid — ' + fmt(dep(o)) + '</span>'
