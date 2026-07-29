@@ -24,28 +24,28 @@
         { en: 'Stroller', es: 'Carriola', dim: '30×36in', p: 165, wk: [3, 4] },
         { en: 'Crib', es: 'Cuna', dim: '36×48in', p: 240, wk: [4, 6] },
         { en: 'Throw', es: 'Sofá', dim: '50×60in', p: 340, wk: [6, 8] }] },
-    { id: 'baby', num: '03', img: '/assets/blanket-mint.jpg', en: 'Baby Sets', es: 'Sets de bebé',
+    { id: 'baby', num: '03', img: '/assets/cat-baby.jpg', en: 'Baby Sets', es: 'Sets de bebé',
       ben: 'Booties, bonnets and rattles for arrivals, baptisms and first photos.',
       bes: 'Zapatitos, gorritos y sonajas para recién nacidos, bautizos y primeras fotos.',
       sizes: [
         { en: 'Booties + bonnet', es: 'Zapatitos + gorrito', dim: '0–12m', p: 48, wk: [1, 2] },
         { en: 'Set + rattle', es: 'Set + sonaja', dim: '0–12m', p: 68, wk: [1, 2] },
         { en: 'Full layette', es: 'Ajuar completo', dim: '5 pieces', p: 120, wk: [2, 3] }] },
-    { id: 'wear', num: '04', img: '/assets/bunny-overalls.jpg', en: 'Wearables', es: 'Para vestir',
+    { id: 'wear', num: '04', img: '/assets/cat-wear.jpg', en: 'Wearables', es: 'Para vestir',
       ben: 'Beanies, scarves and little cardigans in your colors — sized to the person.',
       bes: 'Gorros, bufandas y cárdigans en tus colores — a la medida de la persona.',
       sizes: [
         { en: 'Beanie', es: 'Gorro', dim: 'baby–adult', p: 42, wk: [1, 2] },
         { en: 'Scarf', es: 'Bufanda', dim: '60in', p: 75, wk: [2, 3] },
         { en: 'Kids cardigan', es: 'Cárdigan infantil', dim: '1–8y', p: 110, wk: [3, 4] }] },
-    { id: 'minis', num: '05', img: '/assets/squirrel-red.jpg', en: 'Minis & Charms', es: 'Minis y llaveros',
+    { id: 'minis', num: '05', img: '/assets/cat-minis.jpg', en: 'Minis & Charms', es: 'Minis y llaveros',
       ben: 'Keychains and pocket-size minis — party favors, bag charms, tiny gifts.',
       bes: 'Llaveros y minis de bolsillo — recuerdos de fiesta, dijes, regalitos.',
       sizes: [
         { en: 'Single charm', es: 'Llavero', dim: '2.5in', p: 18, wk: [1, 1] },
         { en: 'Trio', es: 'Trío', dim: '2.5in ×3', p: 45, wk: [1, 2] },
         { en: 'Party set (10)', es: 'Set fiesta (10)', dim: '2.5in ×10', p: 130, wk: [2, 3] }] },
-    { id: 'home', num: '06', img: '/assets/blanket-white.jpg', en: 'Home & Decor', es: 'Hogar y decoración',
+    { id: 'home', num: '06', img: '/assets/cat-home.jpg', en: 'Home & Decor', es: 'Hogar y decoración',
       ben: 'Pillows, garlands and wall pieces that make a room feel yours.',
       bes: 'Cojines, guirnaldas y piezas de pared que hacen tuyo un espacio.',
       sizes: [
@@ -81,6 +81,10 @@
     fCat: 'What are we making?', fSize: 'Pick a size', fDesc: 'Describe your idea',
     fDescPh: '“My daughter’s cat as a little witch, with a purple nose and a tiny broom…”',
     fDescHint: 'A photo, a sketch or three sentences — anything works. You can send reference photos after checkout too.',
+    conceptBtn: '✨ Preview my piece with AI', conceptWorking: '✨ Sketching your idea…',
+    conceptNote: 'An AI sketch of your idea — Lulu crochets the real one, stitch by stitch. 💗',
+    conceptErr: 'The sketch didn’t work this time — your words are all Lulu needs anyway.',
+    micHint: 'Listening… describe your piece',
     fColors: 'Colors', fColorsPh: 'dusty pink, cream, sage…', fRef: 'Reference', fRefPh: 'Drop a photo or sketch',
     optional: '(optional)', fName: 'Your name', fEmail: 'Email',
     fRush: '⚡ Rush my piece', fRushSub: '+25% · jumps the queue, −40% wait',
@@ -151,6 +155,10 @@
     fCat: '¿Qué vamos a hacer?', fSize: 'Elige el tamaño', fDesc: 'Describe tu idea',
     fDescPh: '“El gato de mi hija como brujita, con nariz morada y su escobita…”',
     fDescHint: 'Una foto, un boceto o tres frases — lo que sea sirve. También puedes mandar referencias después del pago.',
+    conceptBtn: '✨ Ver mi pieza con IA', conceptWorking: '✨ Dibujando tu idea…',
+    conceptNote: 'Un boceto de tu idea hecho con IA — Lulu teje la de verdad, puntada a puntada. 💗',
+    conceptErr: 'El boceto no salió esta vez — con tus palabras le basta a Lulu.',
+    micHint: 'Escuchando… describe tu pieza',
     fColors: 'Colores', fColorsPh: 'rosa viejo, crema, salvia…', fRef: 'Referencia', fRefPh: 'Sube una foto o boceto',
     optional: '(opcional)', fName: 'Tu nombre', fEmail: 'Correo',
     fRush: '⚡ Pieza urgente', fRushSub: '+25% · se adelanta en la fila, −40% de espera',
@@ -234,7 +242,8 @@
     orderCode: null,
     checkoutHint: null, // null | 'validate' | 'canceled' | 'error'
     mpane: 1, // mobile sub-step within step 1 (1 category · 2 size · 3 details · 4 estimate)
-    form: { cat: 'dolls', size: 1, colors: '', palette: [], desc: '', name: '', email: '', rush: false, refName: '' }
+    form: { cat: 'dolls', size: 1, colors: '', palette: [], desc: '', name: '', email: '', rush: false, refName: '' },
+    conceptPath: null, conceptUrl: null
   };
   if (state.lang !== 'en' && state.lang !== 'es') state.lang = 'en';
 
@@ -600,6 +609,71 @@
     $('back-home').addEventListener('click', function () { location.hash = ''; });
 
     $('f-desc').addEventListener('input', function (e) { state.form.desc = e.target.value; renderSummary(); });
+
+    /* ---- Dictation (Web Speech API) ---- */
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var micBtn = $('btn-mic');
+    if (SR && micBtn) {
+      micBtn.hidden = false;
+      var rec = null;
+      micBtn.addEventListener('click', function () {
+        if (rec) { rec.stop(); return; }
+        rec = new SR();
+        rec.lang = state.lang === 'es' ? 'es-MX' : 'en-US';
+        rec.continuous = true;
+        rec.interimResults = false;
+        var base = $('f-desc').value ? $('f-desc').value.replace(/\s+$/, '') + ' ' : '';
+        micBtn.classList.add('rec');
+        rec.onresult = function (ev) {
+          var text = '';
+          for (var i = 0; i < ev.results.length; i++) text += ev.results[i][0].transcript + ' ';
+          $('f-desc').value = base + text.trim();
+          state.form.desc = $('f-desc').value;
+          renderSummary();
+        };
+        rec.onend = function () { micBtn.classList.remove('rec'); rec = null; };
+        rec.onerror = function () { micBtn.classList.remove('rec'); rec = null; };
+        rec.start();
+      });
+    }
+
+    /* ---- AI concept preview (design-agent) ---- */
+    var conceptBtn = $('btn-concept');
+    if (conceptBtn && window.LULU_CONFIG && window.LULU_CONFIG.SUPABASE_URL) {
+      conceptBtn.hidden = false;
+      conceptBtn.addEventListener('click', function () {
+        var idea = $('f-desc').value.trim();
+        if (idea.length < 8) { $('f-desc').focus(); return; }
+        conceptBtn.disabled = true;
+        conceptBtn.querySelector('span').textContent = t().conceptWorking;
+        fetch(window.LULU_CONFIG.SUPABASE_URL + '/functions/v1/design-agent', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript: idea, lang: state.lang })
+        }).then(function (r) { return r.json(); }).then(function (res) {
+          conceptBtn.disabled = false;
+          conceptBtn.querySelector('span').textContent = t().conceptBtn;
+          if (!res || res.error || !res.design) { siteToast(t().conceptErr); return; }
+          var d = res.design;
+          // apply the agent's picks to the form
+          if (CATS.some(function (c) { return c.id === d.cat_id; })) state.form.cat = d.cat_id;
+          state.form.size = d.size_idx || 0;
+          $('f-desc').value = state.lang === 'es' ? d.desc_es : d.desc_en;
+          state.form.desc = $('f-desc').value;
+          if (d.colors) { state.form.colors = d.colors; var fc = $('f-colors'); if (fc) fc.value = d.colors; }
+          state.conceptPath = res.concept_path || null;
+          state.conceptUrl = res.concept_url || null;
+          if (res.concept_url) {
+            $('concept-img').src = res.concept_url;
+            $('concept-card').hidden = false;
+          }
+          renderAll();
+        }).catch(function () {
+          conceptBtn.disabled = false;
+          conceptBtn.querySelector('span').textContent = t().conceptBtn;
+          siteToast(t().conceptErr);
+        });
+      });
+    }
     $('f-colors').addEventListener('input', function (e) { state.form.colors = e.target.value; });
     $('f-rush').addEventListener('change', function (e) { state.form.rush = e.target.checked; renderSummary(); });
 
@@ -663,6 +737,7 @@
           size_idx: Math.min(state.form.size, q.cat.sizes.length - 1),
           rush: state.form.rush,
           desc: state.form.desc.trim(),
+          concept_path: state.conceptPath || undefined,
           colors: composedColors() || '—',
           lang: state.lang
         }).then(function (res) {

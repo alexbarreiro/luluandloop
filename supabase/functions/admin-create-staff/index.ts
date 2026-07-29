@@ -44,6 +44,12 @@ Deno.serve(async (req) => {
   const role = ["owner", "supervisor", "artisan"].includes(String(body.role))
     ? String(body.role) : "artisan";
   const specialty = String(body.specialty ?? "").trim().slice(0, 120);
+  const sfRaw = body.ship_from as Record<string, unknown> | null;
+  const shipFrom = sfRaw && sfRaw.street1 ? {
+    name, street1: String(sfRaw.street1).slice(0, 120), city: String(sfRaw.city ?? "").slice(0, 80),
+    state: String(sfRaw.state ?? "").slice(0, 40), zip: String(sfRaw.zip ?? "").slice(0, 16),
+    country: String(sfRaw.country ?? "MX").toUpperCase().slice(0, 2), phone: String(sfRaw.phone ?? "").slice(0, 24),
+  } : null;
   const color = /^#[0-9A-Fa-f]{6}$/.test(String(body.color)) ? String(body.color) : "#8A6FA8";
   const capacity = Math.min(12, Math.max(1, Number(body.capacity) || 4));
 
@@ -61,7 +67,7 @@ Deno.serve(async (req) => {
   }
 
   const { error: profErr } = await admin.from("profiles").insert({
-    id: created.user.id, email, name, role, specialty, color, capacity, active: true,
+    id: created.user.id, email, name, role, specialty, color, capacity, active: true, ship_from: shipFrom,
   });
   if (profErr) {
     await admin.auth.admin.deleteUser(created.user.id);

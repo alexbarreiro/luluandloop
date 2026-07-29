@@ -481,3 +481,21 @@ body.view-order #view-home { display: none; }
   html { scroll-behavior: auto; }
   .marquee-track { animation-duration: 90s; }
 }
+
+/* ---------- Dictation + AI concept preview ---------- */
+.mic-btn {
+  position: absolute; right: 10px; bottom: 10px; border: 1px solid var(--border);
+  background: var(--card); border-radius: 50%; width: 38px; height: 38px;
+  font-size: 17px; cursor: pointer; line-height: 1;
+}
+.mic-btn.rec { background: var(--pink); border-color: var(--pink); animation: micpulse 1.2s infinite; }
+@keyframes micpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(228,101,126,.4); } 50% { box-shadow: 0 0 0 8px rgba(228,101,126,0); } }
+.concept-btn {
+  margin-top: 10px; border: 1.5px dashed var(--pink); background: var(--accent-light);
+  color: var(--pink-deep); font-weight: 800; font-size: 13.5px; font-family: inherit;
+  padding: 11px 16px; border-radius: 12px; cursor: pointer; width: 100%;
+}
+.concept-btn:disabled { opacity: .55; cursor: wait; }
+.concept-card { margin-top: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 12px; }
+.concept-card img { width: 100%; border-radius: 12px; display: block; }
+.concept-note { font-size: 12px; color: var(--muted); font-weight: 700; margin: 8px 0 0; text-align: center; }

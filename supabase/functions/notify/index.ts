@@ -202,6 +202,21 @@ Deno.serve(async (req) => {
     return Response.json({ ok: true, res });
   }
 
+  if (kind === "ready_to_ship") {
+    // to the studio inbox — Lulu reviews shipping cost before generating a label
+    let artisanName = "the artisan";
+    if (order.artisan_id) {
+      const { data: a } = await admin.from("profiles").select("name").eq("id", String(order.artisan_id)).single();
+      if (a?.name) artisanName = a.name;
+    }
+    const res = await send(STUDIO_INBOX,
+      `📦 ${order.code} is ready to ship (${artisanName})`,
+      shell(`<p style="font-size:15px"><b>${esc(artisanName)}</b> finished <b>${esc(order.item)}</b> (${esc(order.code)}) and marked it ready to ship.</p>
+        <p style="font-size:14px;color:#6E6E7A;line-height:1.6">Next: review the shipping cost from the artisan's location, set the customer price (or waive it), and generate the label after the balance is paid.</p>
+        ${btn(`${SITE_URL}/studio/`, "Review shipping →", true)}`));
+    return Response.json({ ok: true, res });
+  }
+
   if (kind === "review_request") {
     // The daily cron retries until this stamp exists — set it only on real delivery
     const markSent = async (res: { status?: number }) => {

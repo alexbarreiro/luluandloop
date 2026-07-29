@@ -96,11 +96,52 @@ async function handle(req: Request): Promise<Response> {
   if (!orderId) return json({ error: "order_id required" }, 400);
 
   const { data: order } = await admin.from("orders")
-    .select("id, code, item, size_label, email, shipping_name, shipping_address, shipping_rate, tracking_number, balance_paid_at, balance_sent_at, shipping, shipping_waived")
+    .select("id, code, item, size_label, email, shipping_name, shipping_address, shipping_rate, tracking_number, balance_paid_at, balance_sent_at, shipping, shipping_waived, artisan_id")
     .eq("id", orderId).single();
   if (!order) return json({ error: "order not found" }, 404);
   // Once the balance link exists the customer's shipping price is locked
   const priceLocked = !!(order.balance_sent_at || order.balance_paid_at);
+
+  // Ship-from: the assigned artisan's own address (e.g. Mexico) when set,
+  // otherwise the studio's Boston address
+  let shipFrom: Record<string, unknown> = SHIP_FROM as Record<string, unknown>;
+  if (order.artisan_id) {
+    const { data: artisan } = await admin.from("profiles")
+      .select("ship_from").eq("id", order.artisan_id).single();
+    const af = artisan?.ship_from as Record<string, unknown> | null;
+    if (af?.street1 && af?.city && af?.country) shipFrom = af;
+  }
+  const originCountry = String(shipFrom.country ?? "US").toUpperCase();
+
+  // 'manual-ship' — shipping handled outside Shippo (e.g. an Envia.com label
+  // for a Mexico-origin shipment): manager records cost, optional customer
+  // price, tracking number and label URL
+  if (action === "manual-ship") {
+    if (!isManager) return json({ error: "managers only" }, 403);
+    const cost = Number(body.cost);
+    const tracking = String(body.tracking ?? "").trim().slice(0, 60);
+    const labelUrl = String(body.label_url ?? "").trim().slice(0, 500);
+    if (!Number.isFinite(cost) || cost < 0 || cost > 1000) return json({ error: "bad cost" }, 400);
+    const patch: Record<string, unknown> = {
+      shipping_cost: Math.round(cost * 100) / 100,
+      shipping_rate: { rate_id: "manual", provider: String(body.provider ?? "Manual").slice(0, 40),
+        service: String(body.service ?? "").slice(0, 80), amount: String(cost), currency: "USD", days: null },
+    };
+    if (!priceLocked && body.price != null) {
+      const price = Number(body.price);
+      if (!Number.isFinite(price) || price < 0 || price > 1000) return json({ error: "bad price" }, 400);
+      patch.shipping = Math.round(price * 100) / 100;
+      patch.shipping_waived = false;
+    }
+    if (tracking) {
+      patch.tracking_number = tracking;
+      patch.tracking_url = /^https?:\/\//.test(String(body.tracking_url ?? "")) ? String(body.tracking_url) : null;
+    }
+    if (labelUrl && /^https?:\/\//.test(labelUrl)) patch.label_url = labelUrl;
+    const { error } = await admin.from("orders").update(patch).eq("id", order.id);
+    if (error) return json({ error: "could not save manual shipping" }, 500);
+    return json({ ok: true });
+  }
 
   // 'choose' stores the picked rate; our cost + a default customer price
   if (action === "choose") {
@@ -153,18 +194,18 @@ async function handle(req: Request): Promise<Response> {
 
   if (action === "rates") {
     const shipment = await shippo("/shipments/", {
-      address_from: SHIP_FROM, address_to: addressTo,
+      address_from: shipFrom, address_to: addressTo,
       parcels: [parcelFor(order.item, order.size_label ?? "")],
       async: false,
-      ...(addr.country !== "US" ? {
+      ...(addr.country !== originCountry ? {
         customs_declaration: await shippo("/customs/declarations/", {
           contents_type: "MERCHANDISE", non_delivery_option: "RETURN", certify: true,
-          certify_signer: SHIP_FROM.name, eel_pfc: "NOEEI_30_37_a",
+          certify_signer: String(shipFrom.name ?? "Lulu & Loop"), eel_pfc: "NOEEI_30_37_a",
           items: [{
             description: "Handmade crochet item", quantity: 1,
             net_weight: parcelFor(order.item, order.size_label ?? "").weight,
             mass_unit: "lb", value_amount: "50", value_currency: "USD",
-            origin_country: "US",
+            origin_country: originCountry,
           }],
         }).then((d: { object_id: string }) => d.object_id),
       } : {}),
@@ -176,7 +217,11 @@ async function handle(req: Request): Promise<Response> {
       }))
       .sort((a: { amount: string }, b: { amount: string }) => Number(a.amount) - Number(b.amount))
       .slice(0, 6);
-    return json({ rates });
+    if (!rates.length && originCountry !== "US") {
+      return json({ rates, origin_country: originCountry,
+        hint: "No Shippo rates for this origin — Shippo needs your own DHL/FedEx/UPS account for non-US origins. Buy the label on Envia.com and record it with Manual shipping below." });
+    }
+    return json({ rates, origin_country: originCountry });
   }
 
   if (action === "buy") {

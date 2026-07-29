@@ -344,6 +344,20 @@
       '</div>' +
       '<label>Specialty <input id="sf-spec" placeholder="Blankets, lace & borders" value="' + esc(p.specialty) + '"></label>' +
       '<label>Color <input id="sf-color" type="color" value="' + esc(p.color) + '"></label>' +
+      (function () {
+        var sf = p.ship_from || {};
+        return '<div class="toolbar-note" style="margin:6px 0 2px">📍 Ship-from address — only for artisans who ship finished pieces themselves (e.g. from Mexico). Leave empty to ship from the Boston studio.</div>' +
+          '<label>Street <input id="sf-street" value="' + esc(sf.street1 || '') + '" placeholder="Av. Insurgentes Sur 123"></label>' +
+          '<div class="modal-two">' +
+          '<label>City <input id="sf-city" value="' + esc(sf.city || '') + '"></label>' +
+          '<label>State <input id="sf-state" value="' + esc(sf.state || '') + '"></label>' +
+          '</div>' +
+          '<div class="modal-two">' +
+          '<label>ZIP <input id="sf-zip" value="' + esc(sf.zip || '') + '"></label>' +
+          '<label>Country <input id="sf-country" value="' + esc(sf.country || '') + '" placeholder="MX" maxlength="2"></label>' +
+          '</div>' +
+          '<label>Phone <input id="sf-phone" value="' + esc(sf.phone || '') + '" placeholder="+52 55 1234 5678"></label>';
+      })() +
       '<div class="modal-error" id="modal-error"></div>' +
       '<button type="submit" class="btn-primary">' + (isNew ? 'Create account' : 'Save changes') + '</button>' +
       '</form>');
@@ -356,6 +370,16 @@
         color: $('sf-color').value,
         capacity: parseInt($('sf-cap').value, 10) || 4
       };
+      var street = $('sf-street').value.trim();
+      patch.ship_from = street ? {
+        name: patch.name,
+        street1: street,
+        city: $('sf-city').value.trim(),
+        state: $('sf-state').value.trim(),
+        zip: $('sf-zip').value.trim(),
+        country: ($('sf-country').value.trim() || 'MX').toUpperCase(),
+        phone: $('sf-phone').value.trim()
+      } : null;
       var op;
       if (isNew) {
         op = S.createStaff(Object.assign(patch, {
@@ -679,6 +703,39 @@
     });
   }
 
+  function openManualShipModal(o) {
+    openModal('Manual shipping — ' + o.code.slice(-4),
+      '<div class="modal-form">' +
+      '<div class="toolbar-note" style="margin-bottom:10px">For labels bought outside Shippo (e.g. Envia.com for shipments from Mexico). Record our cost, the customer price, and the tracking number once you have the label.</div>' +
+      '<div class="modal-two">' +
+      '<label>Our label cost (USD) <input type="number" id="ms-cost" min="0" step="0.01"></label>' +
+      '<label>Customer pays (USD) <input type="number" id="ms-price" min="0" step="0.01"></label>' +
+      '</div>' +
+      '<label>Carrier / service <input id="ms-provider" placeholder="Envia · DHL Express"></label>' +
+      '<label>Tracking number (once shipped) <input id="ms-tracking"></label>' +
+      '<label>Label PDF URL (optional) <input id="ms-label" placeholder="https://…"></label>' +
+      '<div class="modal-error" id="ms-err"></div>' +
+      '<button class="btn-primary" id="ms-save">Save shipping</button>' +
+      '</div>');
+    $('ms-save').addEventListener('click', function () {
+      var cost = parseFloat($('ms-cost').value);
+      if (!(cost >= 0)) { $('ms-err').textContent = 'Enter our label cost'; return; }
+      var payload = {
+        cost: cost,
+        provider: $('ms-provider').value.trim() || 'Manual',
+        tracking: $('ms-tracking').value.trim(),
+        label_url: $('ms-label').value.trim()
+      };
+      var priceVal = parseFloat($('ms-price').value);
+      if (priceVal >= 0) payload.price = priceVal;
+      $('ms-save').disabled = true;
+      S.manualShip(o, payload).then(refresh).then(function () {
+        closeModal(); renderAll(); renderDrawer();
+        toast('Manual shipping saved');
+      }).catch(function (err) { $('ms-save').disabled = false; $('ms-err').textContent = err.message; });
+    });
+  }
+
   /* ---------- Financials (owner) ----------
      Revenue is booked by when money actually arrived (paid stamps); shipping
      margin = collected − label cost (waived shipping shows as a loss);
@@ -798,6 +855,9 @@
         '<div class="piece-foot"><span class="chip ' + (finished ? 'green' : 'soft') + '">' + esc(STAGES[o.stage]) + '</span>' +
         // artisans communicate with the customer once the piece is In progress
         (o.stage >= 2 ? '<button class="btn-mini" data-thread="' + esc(o.code) + '">💬 Customer</button>' : '') +
+        (!finished && o.stage >= 2 && !o.ready_to_ship_at
+          ? '<button class="btn-mini" data-ready="' + esc(o.code) + '">📦 Ready to ship</button>' : '') +
+        (o.ready_to_ship_at ? '<span class="chip green">📦 ready to ship</span>' : '') +
         (finished ? '' : '<button class="btn-primary btn-sm" data-report="' + esc(o.code) + '">Report progress →</button>') +
         '</div>' + repHtml + '</div></div>';
     }
@@ -812,6 +872,17 @@
       b.addEventListener('click', function () {
         var o = state.orders.find(function (x) { return x.code === b.getAttribute('data-thread'); });
         if (o) openThreadModal(o);
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-ready]'), function (b) {
+      b.addEventListener('click', function () {
+        var o = state.orders.find(function (x) { return x.code === b.getAttribute('data-ready'); });
+        if (!o) return;
+        b.disabled = true;
+        S.markReadyToShip(o).then(refresh).then(function () {
+          renderAll();
+          toast('Lulu was notified — she\u2019ll review shipping and generate the label \ud83d\udce6');
+        }).catch(function (err) { b.disabled = false; toast(err.message, true); });
       });
     });
   }
@@ -904,6 +975,20 @@
     $('drawer-cust').textContent = o.customer + ' · ' + (o.where_from || '—') + (o.email ? ' · ' + o.email : '');
     $('drawer-img').src = o.img;
     $('drawer-desc').textContent = '“' + o.desc_text + '”';
+    // AI concept image from the customer's dictated idea
+    var oldConcept = document.getElementById('drawer-concept');
+    if (oldConcept) oldConcept.remove();
+    if (o.concept_path) {
+      var conceptBox = document.createElement('div');
+      conceptBox.id = 'drawer-concept';
+      conceptBox.innerHTML = '<div class="drawer-section-title" style="margin-top:10px">✨ AI concept (customer\u2019s idea)</div>' +
+        '<img class="photo" style="max-height:220px" alt="AI concept">';
+      $('drawer-desc').insertAdjacentElement('afterend', conceptBox);
+      S.evidenceUrl(o.concept_path).then(function (url) {
+        var img = conceptBox.querySelector('img');
+        if (img && url) img.src = url;
+      }).catch(function () { conceptBox.remove(); });
+    }
     $('drawer-chips').innerHTML =
       '<span class="tag">' + esc(o.size_label || '—') + '</span>' +
       '<span class="tag">🎨 ' + esc(o.colors || '—') + '</span>' +
@@ -1104,6 +1189,9 @@
       : '<span class="muted">No shipping address on file (collected at deposit checkout' +
         (S.mode === 'demo' ? '; demo orders don’t have one — rates below are samples' : '') + ').</span>';
 
+    var readyBanner = o.ready_to_ship_at
+      ? '<div class="chip green" style="margin-bottom:8px">📦 Artisan marked ready to ship · ' + esc(fmtDate(o.ready_to_ship_at)) + '</div>'
+      : '';
     var chosen = o.shipping_rate;
     var cost = o.shipping_cost != null ? Number(o.shipping_cost) : (chosen ? Number(chosen.amount) : null);
     var custPrice = o.shipping_waived ? 0 : (o.shipping != null ? Number(o.shipping) : cost);
@@ -1121,7 +1209,7 @@
             : '');
       }
     }
-    $('ship-rate-chosen').innerHTML = chosenHtml;
+    $('ship-rate-chosen').innerHTML = readyBanner + chosenHtml;
 
     // Customer price controls (markup / courtesy waive) — until the link is sent
     var priceControls = '';
@@ -1172,8 +1260,14 @@
         actions += '<span class="field-note">Label unlocks once the balance is paid.</span>';
       }
     }
-    $('ship-actions').innerHTML = priceControls + actions;
+    var manualBtn = (isManager() && !o.tracking_number)
+      ? '<button class="btn-mini" id="btn-manual-ship" style="margin-top:8px">✍️ Manual shipping (Envia / other)</button>'
+      : '';
+    $('ship-actions').innerHTML = priceControls + actions + manualBtn;
     $('ship-tracking').innerHTML = trackingHtml;
+
+    var manualShipBtn = $('btn-manual-ship');
+    if (manualShipBtn) manualShipBtn.addEventListener('click', function () { openManualShipModal(o); });
 
     var saveShipBtn = $('btn-save-shipping');
     if (saveShipBtn) saveShipBtn.addEventListener('click', function () {

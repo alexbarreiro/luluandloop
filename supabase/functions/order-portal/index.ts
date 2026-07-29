@@ -25,7 +25,7 @@ function json(body: unknown, status = 200) {
 const ORDER_FIELDS = "id, code, item, size_label, desc_text, colors, rush, lang, price, deposit, " +
   "balance, shipping, shipping_waived, stage, img, created_at, approved_at, quote_note, balance_url, " +
   "balance_paid_at, deposit_paid_at, deposit_ref, balance_ref, tracking_number, tracking_url, " +
-  "customer, email, share_token";
+  "customer, email, share_token, concept_path";
 
 async function jwtEmail(req: Request): Promise<string | null> {
   const jwt = (req.headers.get("Authorization") ?? "").replace("Bearer ", "");
@@ -174,7 +174,13 @@ Deno.serve(async (req) => {
   if (action === "get") {
     const { data: review } = await admin.from("reviews")
       .select("rating, body, created_at").eq("order_id", order.id).maybeSingle();
-    return json({ order: publicOrder(order), messages: await messagesFor(order.id as string), review });
+    let conceptUrl: string | null = null;
+    if (order.concept_path) {
+      const { data: signed } = await admin.storage.from("evidence")
+        .createSignedUrl(order.concept_path as string, 3600);
+      conceptUrl = signed?.signedUrl ?? null;
+    }
+    return json({ order: publicOrder(order), messages: await messagesFor(order.id as string), review, concept_url: conceptUrl });
   }
 
   if (action === "approve") {

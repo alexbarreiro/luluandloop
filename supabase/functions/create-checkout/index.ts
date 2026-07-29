@@ -28,19 +28,19 @@ const CATALOG: Record<string, { en: string; es: string; img: string; sizes: Size
     { en: "Stroller", es: "Carriola", dim: "30×36in", p: 165 },
     { en: "Crib", es: "Cuna", dim: "36×48in", p: 240 },
     { en: "Throw", es: "Sofá", dim: "50×60in", p: 340 }] },
-  baby: { en: "Baby Sets", es: "Sets de bebé", img: "/assets/blanket-mint.jpg", sizes: [
+  baby: { en: "Baby Sets", es: "Sets de bebé", img: "/assets/cat-baby.jpg", sizes: [
     { en: "Booties + bonnet", es: "Zapatitos + gorrito", dim: "0–12m", p: 48 },
     { en: "Set + rattle", es: "Set + sonaja", dim: "0–12m", p: 68 },
     { en: "Full layette", es: "Ajuar completo", dim: "5 pieces", p: 120 }] },
-  wear: { en: "Wearables", es: "Para vestir", img: "/assets/bunny-overalls.jpg", sizes: [
+  wear: { en: "Wearables", es: "Para vestir", img: "/assets/cat-wear.jpg", sizes: [
     { en: "Beanie", es: "Gorro", dim: "baby–adult", p: 42 },
     { en: "Scarf", es: "Bufanda", dim: "60in", p: 75 },
     { en: "Kids cardigan", es: "Cárdigan infantil", dim: "1–8y", p: 110 }] },
-  minis: { en: "Minis & Charms", es: "Minis y llaveros", img: "/assets/squirrel-red.jpg", sizes: [
+  minis: { en: "Minis & Charms", es: "Minis y llaveros", img: "/assets/cat-minis.jpg", sizes: [
     { en: "Single charm", es: "Llavero", dim: "2.5in", p: 18 },
     { en: "Trio", es: "Trío", dim: "2.5in ×3", p: 45 },
     { en: "Party set (10)", es: "Set fiesta (10)", dim: "2.5in ×10", p: 130 }] },
-  home: { en: "Home & Decor", es: "Hogar y decoración", img: "/assets/blanket-white.jpg", sizes: [
+  home: { en: "Home & Decor", es: "Hogar y decoración", img: "/assets/cat-home.jpg", sizes: [
     { en: "Pillow", es: "Cojín", dim: "16×16in", p: 85 },
     { en: "Garland", es: "Guirnalda", dim: "6ft", p: 70 },
     { en: "Wall piece", es: "Pieza de pared", dim: "up to 20in", p: 95 }] },
@@ -78,6 +78,8 @@ Deno.serve(async (req) => {
   const lang = body.lang === "es" ? "es" : "en";
   const catId = String(body.cat_id ?? "");
   const sizeIdx = Number(body.size_idx);
+  const rawConcept = String(body.concept_path ?? "");
+  const conceptPath = /^concepts\/[\w-]+\.png$/.test(rawConcept) ? rawConcept : null;
 
   if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return bad("name and valid email required");
   if (!desc) return bad("description required");
@@ -103,7 +105,7 @@ Deno.serve(async (req) => {
     .insert({
       code, customer: name, email, item, size_label: sizeLabel,
       desc_text: desc, colors, rush, lang, price, deposit, balance,
-      stage: 0, pending: true, img: cat.img,
+      stage: 0, pending: true, img: cat.img, concept_path: conceptPath,
     })
     .select("id, code")
     .single();

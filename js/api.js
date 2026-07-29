@@ -124,7 +124,7 @@
           if (x.balance_sent_at) o.balance_sent_at = x.balance_sent_at;
           ['shipping_rate', 'tracking_number', 'label_url', 'tracking_url',
             'price', 'deposit', 'balance', 'approved_at',
-            'shipping', 'shipping_cost', 'shipping_waived'].forEach(function (k2) {
+            'shipping', 'shipping_cost', 'shipping_waived', 'ready_to_ship_at'].forEach(function (k2) {
             if (k2 in x) o[k2] = x[k2];
           });
         }
@@ -312,6 +312,18 @@
           return Promise.reject(new Error('shipping price is locked — the balance link was already sent'));
         }
         saveOverride(order.code, { shipping: waived ? 0 : Math.round(price * 100) / 100, shipping_waived: !!waived });
+        return Promise.resolve({ ok: true });
+      },
+      markReadyToShip: function (order) {
+        saveOverride(order.code, { ready_to_ship_at: new Date().toISOString() });
+        return Promise.resolve({ ok: true });
+      },
+      manualShip: function (order, p) {
+        var patch = { shipping_cost: p.cost,
+          shipping_rate: { rate_id: 'manual', provider: p.provider || 'Manual', service: '', amount: String(p.cost), currency: 'USD', days: null } };
+        if (p.price != null) { patch.shipping = p.price; patch.shipping_waived = false; }
+        if (p.tracking) patch.tracking_number = p.tracking;
+        saveOverride(order.code, patch);
         return Promise.resolve({ ok: true });
       },
       buyLabel: function (order) {
@@ -559,6 +571,17 @@
       },
       setShipping: function (order, price, waived) {
         return callFn('shippo', { action: 'set-shipping', order_id: order.id, price: price, waived: !!waived });
+      },
+      markReadyToShip: function (order) {
+        return sb.from('orders').update({ ready_to_ship_at: new Date().toISOString() })
+          .eq('id', order.id).then(function (res) {
+            if (res.error) throw new Error(res.error.message);
+            return { ok: true };
+          });
+      },
+      manualShip: function (order, p) {
+        return callFn('shippo', { action: 'manual-ship', order_id: order.id, cost: p.cost,
+          price: p.price, provider: p.provider, tracking: p.tracking, label_url: p.label_url });
       },
       buyLabel: function (order, rateId) {
         return callFn('shippo', { action: 'buy', order_id: order.id, rate_id: rateId });

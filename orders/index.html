@@ -148,6 +148,11 @@
       <div class="meta" id="m-track-row" hidden><span id="m-track-label"></span><b><a id="m-track" target="_blank" rel="noopener noreferrer"></a></b></div>
     </div>
 
+    <div class="card" id="concept-card" hidden>
+      <img id="o-concept" style="width:100%;border-radius:14px;display:block" alt="AI concept of your piece">
+      <p class="muted" style="text-align:center;margin:8px 0 0" id="concept-cap"></p>
+    </div>
+
     <div class="card" id="pay-card">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
         <h2 id="pc-title"></h2>
@@ -348,6 +353,15 @@
       } else pb.style.display = 'none';
     } else $('approval-card').hidden = true;
 
+    // AI concept from the customer's original idea
+    if (state.conceptUrl) {
+      $('o-concept').src = state.conceptUrl;
+      $('concept-cap').textContent = lang === 'es'
+        ? 'Tu idea, dibujada con IA — Lulu teje la de verdad 💗'
+        : 'Your idea, sketched with AI — Lulu crochets the real one 💗';
+      $('concept-card').hidden = false;
+    } else $('concept-card').hidden = true;
+
     // payments & invoice
     var ship = Number(o.shipping) || 0;
     function payLine(label, amount, paidAt, ref, extra) {
@@ -423,6 +437,7 @@
       state.order = res.order;
       state.messages = res.messages || [];
       state.review = res.review || null;
+      state.conceptUrl = res.concept_url || null;
       renderOrder();
     });
   }
