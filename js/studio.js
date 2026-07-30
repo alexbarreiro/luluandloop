@@ -1134,6 +1134,8 @@
     sel.innerHTML = '<option value="">— Unassigned —</option>' + artisans.map(function (a) {
       var load = state.orders.filter(function (x) { return x.artisan_id === a.id && x.stage >= 1 && x.stage < 4; }).length;
       var specialty = (a.specialty || a.role).split(',')[0].toLowerCase();
+      // keep option labels short — long ones get clipped by the native select on mobile
+      if (specialty.length > 16) specialty = specialty.slice(0, 15).replace(/\s+$/, '') + '…';
       return '<option value="' + esc(a.id) + '">' + esc(a.name + ' — ' + specialty + ' (' + load + '/' + (a.capacity || 4) + ')') + '</option>';
     }).join('');
     sel.value = o.artisan_id || '';

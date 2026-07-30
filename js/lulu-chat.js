@@ -253,10 +253,17 @@
   }
 
   /* ---------- agent call ---------- */
+  function autogrow() {
+    if (!inputEl) return;
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 96) + 'px';
+  }
+
   function send() {
     var text = inputEl.value.trim();
     if (!text || busy) return;
     inputEl.value = '';
+    autogrow();
     messages.push({ role: 'me', text: text });
     busy = true; save(); render();
     fetch(cfg.SUPABASE_URL + '/functions/v1/lulu-agent', {
@@ -359,6 +366,9 @@
       unlockBody();
       stopPolling();
     });
+    // grow the composer with the text (up to max-height) so wrapped lines
+    // are never half-clipped
+    inputEl.addEventListener('input', autogrow);
     // when the keyboard opens on focus, re-fit and keep the thread pinned
     inputEl.addEventListener('focus', function () {
       setTimeout(fitPanel, 60);

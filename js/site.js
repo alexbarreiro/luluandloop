@@ -658,6 +658,9 @@
     var micBtn = $('btn-mic');
     if (SR && micBtn) {
       micBtn.hidden = false;
+      // reserve space under the text so the last typed line never hides
+      // behind the floating mic button
+      $('f-desc').style.paddingBottom = '56px';
       var rec = null;
       micBtn.addEventListener('click', function () {
         if (rec) { rec.stop(); return; }

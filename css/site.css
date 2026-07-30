@@ -54,7 +54,10 @@ button { font-family: inherit; }
 .brand-word { font-weight: 900; font-size: 24px; letter-spacing: -.01em; }
 .brand-word .amp { color: var(--pink); }
 .brand-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pink); transform: translateY(-1px); }
-.nav-links { display: flex; gap: 22px; font-weight: 700; font-size: 14px; margin-left: 8px; }
+.nav-links { display: flex; gap: 22px; font-weight: 700; font-size: 14px; margin-left: 8px; flex-wrap: wrap; }
+/* never break inside a link — long Spanish labels wrap as whole links instead */
+.nav-links a { white-space: nowrap; }
+@media (max-width: 480px) { .nav-links { gap: 12px; font-size: 12.5px; } }
 .nav-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 .lang-toggle { display: flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; font-size: 12px; font-weight: 800; }
 .lang-toggle button {
@@ -436,7 +439,9 @@ body.view-order #view-home { display: none; }
   .wizard[data-step="1"][data-mpane="3"] .m-pane[data-pane="3"] { display: flex; }
   .wizard[data-step="1"][data-mpane="4"] .m-pane[data-pane="4"] { display: block; }
   .wizard[data-step="1"] .summary-card { position: static; }
-  .wizard[data-step="1"] .order-wrap, .order-wrap { padding-bottom: 130px; }
+  /* clear the sticky bar AND the lifted chat launcher above it, so nothing
+     (e.g. the rush checkbox label) is stuck under the launcher at full scroll */
+  .wizard[data-step="1"] .order-wrap, .order-wrap { padding-bottom: 210px; }
   .wizard[data-step="1"] .step1-sub { display: none; }
 
   .cat-grid { grid-template-columns: repeat(2, 1fr); }
@@ -469,6 +474,12 @@ body.view-order #view-home { display: none; }
     max-width: 60vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .mbar-next:disabled { background: var(--disabled); color: var(--muted); }
+  /* 360px phones: tighten the sticky bar so the CTA never ellipsizes */
+  @media (max-width: 380px) {
+    .mbar-total { font-size: 15px; }
+    .mbar-dep { font-size: 10.5px; }
+    .mbar-next { font-size: 14px; padding: 14px 14px; max-width: none; }
+  }
 
   /* On mobile the bottom bar is the single CTA — hide the in-card duplicate */
   .wizard[data-step="1"] .btn-continue { display: none; }

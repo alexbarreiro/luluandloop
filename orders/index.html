@@ -41,9 +41,11 @@
   .chip { display:inline-block; font-size:11.5px; font-weight:800; border-radius:999px; padding:4px 11px; }
   .chip.pink { background:var(--soft); color:var(--deep); } .chip.green { background:#DFE9DD; color:#3E6B4A; }
   .chip.mute { background:#F0EFED; color:var(--t2); }
-  .steps { display:flex; gap:4px; margin:14px 0; flex-wrap:wrap; }
-  .stepc { flex:1; min-width:70px; text-align:center; font-size:10.5px; font-weight:800; color:var(--muted);
-    padding-top:16px; position:relative; }
+  /* 5 equal columns — long Spanish labels wrap inside their chip instead of
+     pushing the last chip onto its own full-width row */
+  .steps { display:grid; grid-template-columns:repeat(5,1fr); gap:4px; margin:14px 0; }
+  .stepc { min-width:0; text-align:center; font-size:10.5px; font-weight:800; color:var(--muted);
+    padding-top:16px; position:relative; overflow-wrap:break-word; }
   .stepc::before { content:''; position:absolute; top:0; left:0; right:0; height:6px; border-radius:99px; background:#EAE6E9; }
   .stepc.done { color:var(--deep); } .stepc.done::before { background:var(--pink); }
   .stepc.now { color:var(--ink); } .stepc.now::before { background:var(--soft); border:1px solid var(--pink); }
@@ -229,7 +231,7 @@
   </div>
 </div>
 
-<script src="/js/config.js?v=20260731c"></script>
+<script src="/js/config.js?v=20260731d"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
@@ -734,6 +736,6 @@
   } else show('v-access');
 })();
 </script>
-<script src="/js/lulu-chat.js?v=20260731c" defer></script>
+<script src="/js/lulu-chat.js?v=20260731d" defer></script>
 </body>
 </html>
