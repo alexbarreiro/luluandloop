@@ -28,6 +28,16 @@
   .btn.pink { background:#E4657E; color:#FFF4F2; } .btn.pink:hover { background:#2A2A33; }
   .note { font-size:13px; color:#B6B1BC; margin-top:18px; line-height:1.6; }
   .word { font-weight:900; font-size:19px; margin-bottom:22px; } .word .amp { color:#E4657E; }
+  .acct { margin-top:16px; text-align:left; }
+  .acct h2 { font-weight:900; letter-spacing:-.02em; font-size:20px; margin:0 0 6px; text-align:center; }
+  .acct p { font-size:13.5px; margin-bottom:14px; text-align:center; }
+  .acct input { width:100%; box-sizing:border-box; font-family:inherit; font-size:16px; padding:13px 14px;
+    border:1px solid #F0E2D8; border-radius:12px; background:#FFF8F0; color:#2A2A33; margin-bottom:10px; }
+  .acct button { width:100%; border:none; cursor:pointer; background:#E4657E; color:#FFF4F2; font-weight:800;
+    font-size:15px; padding:14px; border-radius:999px; font-family:inherit; }
+  .acct button:disabled { background:#EAE6E9; color:#B6B1BC; }
+  .acct .err { color:#9A4B60; font-size:13px; font-weight:700; min-height:16px; margin:2px 0 8px; }
+  .acct .ok { color:#3E6B4A; font-size:14px; font-weight:800; text-align:center; padding:8px 0; }
 </style>
 </head>
 <body>
@@ -42,12 +52,32 @@
       <a class="btn" id="t-home" href="/"></a>
     </div>
     <p class="note" id="t-note"></p>
+    <div class="acct" id="acct" hidden>
+      <h2 id="ac-title"></h2>
+      <p id="ac-sub"></p>
+      <form id="ac-form" novalidate>
+        <input id="ac-email" name="email" type="email" autocomplete="username">
+        <input id="ac-pass" name="new-password" type="password" autocomplete="new-password">
+        <input id="ac-pass2" name="confirm-password" type="password" autocomplete="new-password">
+        <div class="err" id="ac-err"></div>
+        <button id="ac-go" type="submit"></button>
+      </form>
+      <div class="ok" id="ac-done" hidden></div>
+    </div>
   </div>
+<script src="/js/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
   'use strict';
-  // the wizard stashed the form before redirecting to Stripe — clear the PII
-  try { sessionStorage.removeItem('luluandloop.pendingForm'); } catch (e) { /* ignore */ }
+  // the wizard stashed the form before redirecting to Stripe — read the email
+  // for the account card, then clear the PII
+  var checkoutEmail = '';
+  try {
+    var pf = JSON.parse(sessionStorage.getItem('luluandloop.pendingForm') || 'null');
+    checkoutEmail = (pf && pf.form && pf.form.email) || localStorage.getItem('luluandloop.lastEmail') || '';
+    sessionStorage.removeItem('luluandloop.pendingForm');
+  } catch (e) { /* ignore */ }
   var params = new URLSearchParams(location.search);
   var kind = params.get('kind') === 'balance' ? 'balance' : 'deposit';
   var code = (params.get('code') || '').replace(/[^\w-]/g, '');
@@ -80,6 +110,65 @@
     c.textContent = code;
     c.hidden = false;
     document.getElementById('t-portal').href = '/orders/?code=' + encodeURIComponent(code) + '&lang=' + lang;
+  }
+
+  /* ---- first order → create your account (clearly a NEW account, so the
+     browser offers to generate & save a strong password) ---- */
+  var $ = function (id) { return document.getElementById(id); };
+  var A = lang === 'es' ? {
+    title: 'Crea tu cuenta',
+    sub: 'Usa el correo de tu compra y todas tus piezas quedarán en un solo lugar. Tu navegador puede sugerirte una contraseña segura.',
+    pass: 'Contraseña (mín. 8 caracteres)', pass2: 'Confirma tu contraseña',
+    go: 'Crear mi cuenta', mismatch: 'Las contraseñas no coinciden',
+    needAll: 'Se necesita correo y contraseña (8+ caracteres)',
+    confirm: 'Cuenta creada 🎉 Revisa tu correo para confirmarla.',
+    ready: 'Cuenta lista 🎉 Ya puedes entrar a tu portal.',
+    exists: 'Ya tienes una cuenta con este correo — inicia sesión en tu portal.'
+  } : {
+    title: 'Create your account',
+    sub: 'Use your checkout email and all your pieces stay in one place. Your browser can suggest a strong password.',
+    pass: 'Password (min 8 characters)', pass2: 'Confirm password',
+    go: 'Create my account', mismatch: 'Passwords don\u2019t match',
+    needAll: 'Email and password (8+ characters) required',
+    confirm: 'Account created 🎉 Check your email to confirm it.',
+    ready: 'Account ready 🎉 You can open your portal now.',
+    exists: 'You already have an account with this email — sign in on your portal.'
+  };
+  var cfg = window.LULU_CONFIG || {};
+  var sb = (kind === 'deposit' && window.supabase && cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY)
+    ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+  if (sb) {
+    $('acct').hidden = false;
+    $('ac-title').textContent = A.title;
+    $('ac-sub').textContent = A.sub;
+    $('ac-email').placeholder = lang === 'es' ? 'Correo' : 'Email';
+    $('ac-email').value = checkoutEmail;
+    $('ac-pass').placeholder = A.pass;
+    $('ac-pass2').placeholder = A.pass2;
+    $('ac-go').textContent = A.go;
+    $('ac-form').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var email = $('ac-email').value.trim();
+      var pass = $('ac-pass').value;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || pass.length < 8) { $('ac-err').textContent = A.needAll; return; }
+      if (pass !== $('ac-pass2').value) { $('ac-err').textContent = A.mismatch; return; }
+      $('ac-go').disabled = true;
+      sb.auth.signUp({ email: email, password: pass }).then(function (res) {
+        $('ac-go').disabled = false;
+        if (res.error) {
+          $('ac-err').textContent = /already|registered/i.test(res.error.message) ? A.exists : res.error.message;
+          return;
+        }
+        // Supabase quirk: an existing confirmed email returns a user with no identities
+        if (res.data.user && res.data.user.identities && res.data.user.identities.length === 0) {
+          $('ac-err').textContent = A.exists;
+          return;
+        }
+        $('ac-form').hidden = true;
+        $('ac-done').hidden = false;
+        $('ac-done').textContent = res.data.session ? A.ready : A.confirm;
+      });
+    });
   }
 })();
 </script>

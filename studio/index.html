@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,400;0,6..12,600;0,6..12,700;0,6..12,800;0,6..12,900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/studio.css?v=20260731d">
+<link rel="stylesheet" href="/css/studio.css?v=20260731e">
 </head>
 <body>
 
@@ -117,6 +117,10 @@
         </div>
       </div>
     </div>
+    <div class="view" id="view-order">
+      <button id="order-page-back">← Back to board</button>
+      <div id="order-page-slot"></div>
+    </div>
     <div class="view" id="view-financials">
       <div class="fin-tiles" id="fin-tiles"></div>
       <p class="fin-section-title">Month by month</p>
@@ -139,6 +143,7 @@
       <div class="drawer-top">
         <span class="drawer-code" id="drawer-code"></span>
         <span style="display:flex;gap:8px">
+          <button class="drawer-pin" id="drawer-expand" title="Open full size in the work area" aria-label="Open order full size">⤢</button>
           <button class="drawer-pin" id="drawer-pin" title="Pin to the right / center" aria-label="Toggle pinned layout">⇥</button>
           <button class="drawer-close" id="drawer-close" aria-label="Close">✕</button>
         </span>
@@ -225,9 +230,9 @@
 
 <div id="toast-region" role="status" aria-live="assertive" aria-atomic="true"></div>
 
-<script src="/js/config.js?v=20260731d"></script>
+<script src="/js/config.js?v=20260731e"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="/js/api.js?v=20260731d"></script>
-<script src="/js/studio.js?v=20260731d"></script>
+<script src="/js/api.js?v=20260731e"></script>
+<script src="/js/studio.js?v=20260731e"></script>
 </body>
 </html>

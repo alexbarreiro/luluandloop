@@ -25,7 +25,7 @@ function json(body: unknown, status = 200) {
 const ORDER_FIELDS = "id, code, item, size_label, desc_text, colors, rush, lang, price, deposit, " +
   "balance, shipping, shipping_waived, stage, img, created_at, approved_at, quote_note, balance_url, " +
   "balance_paid_at, deposit_paid_at, deposit_ref, balance_ref, tracking_number, tracking_url, " +
-  "customer, email, share_token, concept_path";
+  "customer, email, share_token, concept_path, photo_path";
 
 async function jwtEmail(req: Request): Promise<string | null> {
   const jwt = (req.headers.get("Authorization") ?? "").replace("Bearer ", "");
@@ -37,6 +37,15 @@ async function jwtEmail(req: Request): Promise<string | null> {
 function publicOrder(o: Record<string, unknown>) {
   const { share_token: _t, email: _e, ...rest } = o;
   return rest;
+}
+
+// The order's display picture: approved final photo > AI concept > stock img.
+// Returns a signed URL for bucket paths, null when only the stock img applies.
+async function orderImgUrl(o: Record<string, unknown>): Promise<string | null> {
+  const path = (o.photo_path ?? o.concept_path) as string | null;
+  if (!path) return null;
+  const { data } = await admin.storage.from("evidence").createSignedUrl(path, 3600);
+  return data?.signedUrl ?? null;
 }
 
 async function loadOrder(code: string, token: string, email: string | null) {
@@ -144,18 +153,72 @@ Deno.serve(async (req) => {
     const key = email.toLowerCase();
     if (action === "profile-set") {
       const p = payload.prefs as Record<string, unknown> | null;
+      // sanitize the shipping address to the Stripe address shape
+      const ALLOWED = [
+        "US", "CA", "MX", "GB", "IE", "FR", "ES", "DE", "IT", "PT", "NL", "BE",
+        "CH", "AT", "SE", "NO", "DK", "FI", "PL", "CZ", "AU", "NZ", "JP", "KR",
+        "SG", "BR", "AR", "CL", "CO", "CR", "PA", "DO", "PR",
+      ];
+      const rawShip = (p?.ship_to ?? null) as Record<string, unknown> | null;
+      const clearShip = p?.ship_clear === true;
+      const sf = (k: string, max = 200) => String(rawShip?.[k] ?? "").trim().slice(0, max);
+      let shipTo: Record<string, string> | null = null;
+      if (rawShip) {
+        const a = {
+          line1: sf("line1"), line2: sf("line2"), city: sf("city", 120),
+          state: sf("state", 120), postal_code: sf("postal_code", 20),
+          country: sf("country", 2).toUpperCase(),
+        };
+        const anyFilled = a.line1 || a.line2 || a.city || a.state || a.postal_code;
+        if (a.line1 && a.city && a.postal_code && ALLOWED.includes(a.country)) shipTo = a;
+        else if (anyFilled) return json({ error: "incomplete shipping address — street, city and postal code are required" }, 400);
+      }
+      const shipName = String(p?.ship_name ?? "").trim().slice(0, 120);
       const { error: prefErr } = await admin.from("customer_prefs").upsert({
         email: key,
         display_name: String(p?.display_name ?? "").trim().slice(0, 80),
         lang: p?.lang === "es" ? "es" : "en",
         marketing: p?.marketing !== false,
+        ...(shipTo ? { ship_name: shipName || null, ship_to: shipTo } : {}),
+        ...(clearShip ? { ship_name: null, ship_to: null } : {}),
         updated_at: new Date().toISOString(),
       });
       if (prefErr) return json({ error: "could not save profile — try again" }, 500);
+      if (shipTo) {
+        // Apply the new address only where shipping is still fluid: no label,
+        // not shipped, and no balance link/payment (those lock the priced rate).
+        // A previously chosen Shippo rate is cleared — it was quoted for the
+        // OLD address and would print a label to the wrong place.
+        const { data: affected, error: updErr } = await admin.from("orders")
+          .update({
+            shipping_address: shipTo, shipping_name: shipName || null,
+            shipping_rate: null, shipping_cost: null,
+          })
+          .eq("email", key).is("shipped_at", null).is("label_url", null)
+          .is("balance_sent_at", null).is("balance_paid_at", null)
+          .select("id, code");
+        if (updErr) return json({ error: "could not update your orders — try again" }, 500);
+        // Active orders we intentionally did NOT touch still need staff eyes
+        const { data: locked } = await admin.from("orders")
+          .select("id, code").eq("email", key)
+          .is("shipped_at", null).not("balance_sent_at", "is", null)
+          .is("balance_paid_at", null);
+        const note = (code: string, touched: boolean) => touched
+          ? `Customer updated their shipping address — the previously chosen shipping rate for ${code} was cleared; please re-quote shipping.`
+          : `Customer updated their shipping address AFTER the balance link for ${code} was sent — review shipping and the label address before buying.`;
+        for (const o of [...(affected ?? []).map((o) => ({ ...o, touched: true })),
+                         ...(locked ?? []).map((o) => ({ ...o, touched: false }))]) {
+          await admin.from("messages").insert({
+            order_id: o.id, sender_kind: "system", sender_name: "system", kind: "system",
+            body: note(String(o.code), o.touched),
+          });
+        }
+      }
     }
-    const { data: prefs } = await admin.from("customer_prefs").select("display_name, lang, marketing")
+    const { data: prefs } = await admin.from("customer_prefs")
+      .select("display_name, lang, marketing, ship_name, ship_to")
       .eq("email", key).maybeSingle();
-    return json({ prefs: prefs ?? { display_name: "", lang: "en", marketing: true }, email: key });
+    return json({ prefs: prefs ?? { display_name: "", lang: "en", marketing: true, ship_name: "", ship_to: null }, email: key });
   }
 
   if (action === "list") {
@@ -165,7 +228,11 @@ Deno.serve(async (req) => {
     const { data } = await admin.from("orders").select(ORDER_FIELDS)
       .eq("pending", false).ilike("email", pattern)
       .order("created_at", { ascending: false });
-    return json({ orders: (data ?? []).map(publicOrder) });
+    const out = [];
+    for (const o of data ?? []) {
+      out.push({ ...publicOrder(o), img_url: await orderImgUrl(o) });
+    }
+    return json({ orders: out });
   }
 
   const order = await loadOrder(code, token, email);
@@ -224,13 +291,21 @@ Deno.serve(async (req) => {
         .createSignedUrl(order.concept_path as string, 3600);
       conceptUrl = signed?.signedUrl ?? null;
     }
-    return json({ order: publicOrder(order), messages: await messagesFor(order.id as string), review, concept_url: conceptUrl });
+    return json({ order: { ...publicOrder(order), img_url: await orderImgUrl(order) }, messages: await messagesFor(order.id as string), review, concept_url: conceptUrl });
   }
 
   if (action === "approve") {
     if (order.approved_at) return json({ ok: true, already: true });
+    // the final photo the studio sent for approval becomes the order's picture
+    const { data: apMsg } = await admin.from("messages")
+      .select("photo_path").eq("order_id", order.id).eq("kind", "approval_request")
+      .not("photo_path", "is", null).order("created_at", { ascending: false })
+      .limit(1).maybeSingle();
     const { error } = await admin.from("orders")
-      .update({ approved_at: new Date().toISOString() }).eq("id", order.id);
+      .update({
+        approved_at: new Date().toISOString(),
+        ...(apMsg?.photo_path ? { photo_path: apMsg.photo_path } : {}),
+      }).eq("id", order.id);
     if (error) return json({ error: "could not save approval" }, 500);
     await admin.from("messages").insert({
       order_id: order.id, sender_kind: "system", sender_name: "system", kind: "system",

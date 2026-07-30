@@ -1068,6 +1068,41 @@
     $('drawer-pin').textContent = pinned ? '⛶' : '⇥';
     $('drawer-pin').title = pinned ? 'Expand to centered view' : 'Pin to the right';
   }
+  // The order panel is a single DOM node that lives either in the overlay
+  // (#drawer-root) or, in full-page mode, inside the work area (#order-page-slot).
+  // All element ids stay intact, so every renderer keeps working in both homes.
+  function orderPanel() { return document.querySelector('.drawer'); }
+  function panelInPage() { return orderPanel().parentElement === $('order-page-slot'); }
+  function movePanelToPage() {
+    var p = orderPanel();
+    if (panelInPage()) return;
+    $('order-page-slot').appendChild(p);
+    p.classList.add('as-page');
+    $('drawer-root').hidden = true;
+    $('drawer-expand').hidden = true;
+    $('drawer-pin').hidden = true;
+  }
+  function movePanelToOverlay() {
+    var p = orderPanel();
+    if (!panelInPage()) return;
+    p.classList.remove('as-page');
+    $('drawer-root').appendChild(p);
+    $('drawer-expand').hidden = false;
+    $('drawer-pin').hidden = false;
+  }
+  function openOrderPage() {
+    movePanelToPage();
+    state.view = 'order';
+    renderAll();
+    window.scrollTo(0, 0);
+  }
+  function leaveOrderPage() {
+    movePanelToOverlay();
+    state.selected = null;
+    if (state.view === 'order') state.view = isManager() ? 'board' : 'mypieces';
+    renderAll();
+  }
+
   function openDrawer(code) {
     lastFocus = document.activeElement;
     state.selected = code;
@@ -1078,6 +1113,7 @@
   }
 
   function closeDrawer() {
+    if (panelInPage()) { leaveOrderPage(); return; }
     var code = state.selected;
     state.selected = null;
     $('drawer-root').hidden = true;
@@ -1266,8 +1302,8 @@
       state.thread = msgs;
       state.threadLoaded = true;
       if (container && document.contains(container)) renderThread(container);
-      var drawerOpen = !$('drawer-root').hidden;
-      if (drawerOpen && state.selected === o.code) renderApproval(o);
+      var drawerVisible = !$('drawer-root').hidden || panelInPage();
+      if (drawerVisible && state.selected === o.code) renderApproval(o);
     }).catch(function (e) { toast('Messages: ' + e.message, true); });
   }
 
@@ -1512,13 +1548,18 @@
   /* ---------- Views ---------- */
   var VIEW_RENDER = { board: renderBoard, team: renderTeam, pay: renderPayments,
     staff: renderStaff, tasks: renderTasks, mypieces: renderMyPieces, mytasks: renderMyTasks,
-    customers: renderCustomers, payouts: renderPayouts, financials: renderFinancials, chats: renderChats };
+    customers: renderCustomers, payouts: renderPayouts, financials: renderFinancials, chats: renderChats,
+    order: renderDrawer };
 
   function renderCurrentView() {
-    ['board', 'team', 'pay', 'staff', 'tasks', 'mypieces', 'mytasks', 'customers', 'payouts', 'financials', 'chats'].forEach(function (v) {
+    // Navigating anywhere else sends the order panel back to its overlay home
+    // and deselects the order, so renderAll stops re-rendering a hidden drawer
+    if (state.view !== 'order' && panelInPage()) { movePanelToOverlay(); state.selected = null; }
+    ['board', 'team', 'pay', 'staff', 'tasks', 'mypieces', 'mytasks', 'customers', 'payouts', 'financials', 'chats', 'order'].forEach(function (v) {
       var el = $('view-' + v);
       if (el) el.classList.toggle('active', state.view === v);
     });
+    if (state.view === 'order' && !selectedOrder()) { state.view = isManager() ? 'board' : 'mypieces'; }
     (VIEW_RENDER[state.view] || function () {})();
   }
 
@@ -1527,7 +1568,7 @@
     renderHead();
     renderStats();
     renderCurrentView();
-    if (state.selected) renderDrawer();
+    if (state.selected && state.view !== 'order') renderDrawer();
   }
 
   /* ---------- Gate / auth ---------- */
@@ -1636,6 +1677,8 @@
     try { localStorage.setItem('luluandloop.studio.pinned', drawerPinned() ? '0' : '1'); } catch (e) { /* ignore */ }
     applyDrawerMode();
   });
+  $('drawer-expand').addEventListener('click', openOrderPage);
+  $('order-page-back').addEventListener('click', leaveOrderPage);
   $('modal-scrim').addEventListener('click', closeModal);
   $('modal-close').addEventListener('click', closeModal);
   document.addEventListener('keydown', function (e) {

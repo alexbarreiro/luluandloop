@@ -217,6 +217,9 @@ Deno.serve(async (req) => {
     jwt?: string; embedded?: boolean; source?: string;
   };
   try { body = await req.json(); } catch { return json({ error: "invalid JSON" }, 400); }
+  // ids of the rows this request creates — returned so clients can dedup
+  // their optimistic copies against the history poll
+  let savedUserRow: { id: string; created_at: string } | null = null;
 
   let jwtEmail: string | null = null;
   if (body.jwt) {
@@ -269,7 +272,10 @@ Deno.serve(async (req) => {
       else history.push({ role: "assistant", content: "[Message written by the HUMAN studio team]: " + m.body });
     }
     history.push({ role: "user", content: text });
-    await admin.from("chat_messages").insert({ chat_id: chatId, role: "user", body: text });
+    const { data: userRow } = await admin.from("chat_messages")
+      .insert({ chat_id: chatId, role: "user", body: text })
+      .select("id, created_at").single();
+    savedUserRow = userRow ?? null;
   } else {
     // legacy stateless contract (older clients)
     history = Array.isArray(body.messages) ? body.messages.slice(-30) : [];
@@ -317,11 +323,17 @@ Deno.serve(async (req) => {
   }
 
   if (!reply) reply = "Hmm, se me enredó el estambre — could you say that once more? 🧶";
+  let savedLuluRow: { id: string; created_at: string } | null = null;
   if (chatId) {
-    await admin.from("chat_messages").insert({
+    const { data } = await admin.from("chat_messages").insert({
       chat_id: chatId, role: "lulu", body: reply,
       meta: actions.length ? { actions } : null,
-    });
+    }).select("id, created_at").single();
+    savedLuluRow = data ?? null;
   }
-  return json({ reply, actions, chat_id: chatId });
+  return json({
+    reply, actions, chat_id: chatId,
+    message_ids: [savedUserRow?.id, savedLuluRow?.id].filter(Boolean),
+    last_at: savedLuluRow?.created_at ?? savedUserRow?.created_at ?? null,
+  });
 });

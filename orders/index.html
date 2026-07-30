@@ -83,6 +83,8 @@
   .pay-line .ref { font-family:ui-monospace,Menlo,monospace; font-size:11px; color:var(--muted); width:100%; }
   .pay-line:last-of-type { border-bottom:none; }
   .courtesy { color:#3E6B4A; font-weight:800; }
+  .linkish { background:none; border:none; color:var(--pink); font:inherit; font-weight:800;
+    font-size:13px; cursor:pointer; margin-top:12px; display:block; text-align:center; width:100%; }
   #invoice { display:none; }
   @media print {
     body.print-invoice .wrap { display:none; }
@@ -124,13 +126,27 @@
       <button id="tab-signin" class="on"></button>
       <button id="tab-signup"></button>
     </div>
-    <div id="auth-form">
-      <input id="a-email" type="email" autocomplete="email">
-      <input id="a-pass" type="password" autocomplete="current-password">
+    <form id="auth-form" novalidate>
+      <input id="a-email" name="email" type="email" autocomplete="username">
+      <input id="a-pass" name="password" type="password" autocomplete="current-password">
+      <input id="a-pass2" name="confirm-password" type="password" autocomplete="new-password" hidden>
       <div class="err" id="a-err"></div>
-      <button class="btn" id="a-go"></button>
-    </div>
+      <button class="btn" id="a-go" type="submit"></button>
+      <button class="linkish" id="a-forgot" type="button"></button>
+    </form>
     <p class="sub" style="margin-top:18px" id="a-note"></p>
+  </div>
+
+  <!-- Password reset (arrives via secure email link) -->
+  <div class="card" id="v-reset" hidden>
+    <h1 id="r-title"></h1>
+    <p class="sub" id="r-sub"></p>
+    <form id="reset-form" novalidate>
+      <input id="r-pass" type="password" autocomplete="new-password">
+      <input id="r-pass2" type="password" autocomplete="new-password">
+      <div class="err" id="r-err"></div>
+      <button class="btn" id="r-go" type="submit"></button>
+    </form>
   </div>
 
   <!-- Order list (account mode) -->
@@ -146,6 +162,17 @@
       <div class="prof-row"><span id="pf-lang-l"></span>
         <select id="pf-lang"><option value="en">English</option><option value="es">Español</option></select></div>
       <label class="check-row"><input type="checkbox" id="pf-marketing"><span id="pf-marketing-l"></span></label>
+      <div style="border-top:1px dashed var(--border);margin-top:14px;padding-top:14px">
+        <h2 id="pf-ship-title" style="font-size:16px"></h2>
+        <p class="sub" id="pf-ship-note" style="font-size:12.5px;margin:0 0 12px"></p>
+        <div class="prof-row"><span id="pf-shipname-l"></span><input id="pf-shipname" autocomplete="shipping name"></div>
+        <div class="prof-row"><span id="pf-addr1-l"></span><input id="pf-addr1" autocomplete="shipping address-line1"></div>
+        <div class="prof-row"><span id="pf-addr2-l"></span><input id="pf-addr2" autocomplete="shipping address-line2"></div>
+        <div class="prof-row"><span id="pf-city-l"></span><input id="pf-city" autocomplete="shipping address-level2"></div>
+        <div class="prof-row"><span id="pf-state-l"></span><input id="pf-state" autocomplete="shipping address-level1"></div>
+        <div class="prof-row"><span id="pf-zip-l"></span><input id="pf-zip" autocomplete="shipping postal-code"></div>
+        <div class="prof-row"><span id="pf-country-l"></span><select id="pf-country"></select></div>
+      </div>
       <button class="btn mini" id="pf-save"></button>
       <div style="border-top:1px dashed var(--border);margin-top:16px;padding-top:14px">
         <div class="prof-row"><span id="pf-pass-l"></span><input id="pf-pass" type="password" autocomplete="new-password"></div>
@@ -231,7 +258,7 @@
   </div>
 </div>
 
-<script src="/js/config.js?v=20260731d"></script>
+<script src="/js/config.js?v=20260731e"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
@@ -269,7 +296,22 @@
     rvSend: 'Send my review', rvThanks: 'Thank you for your review! 💗', rvPick: 'Tap the stars first',
     pfTitle: 'My profile', pfName: 'Display name', pfLang: 'Preferred language',
     pfMarketing: 'Email me about new drops & studio news', pfSave: 'Save profile', pfSaved: 'Saved ✓',
-    pfPass: 'New password (min 8 characters)', pfPassSave: 'Change password', pfPassDone: 'Password changed ✓'
+    pfPass: 'New password (min 8 characters)', pfPassSave: 'Change password', pfPassDone: 'Password changed ✓',
+    aTitleIn: 'Welcome back', aTitleUp: 'Create your account',
+    aSubIn: 'Sign in to see all your pieces, message the studio and approve your finished piece. Your order link from email works too — no account needed.',
+    aSubUp: 'New here? Use the same email you used at checkout and all your pieces appear automatically. Your browser can suggest a strong password.',
+    pass2: 'Confirm password', passMismatch: 'Passwords don\u2019t match',
+    forgot: 'Forgot my password', resetSent: 'Password reset link sent — check your email 💌',
+    aExists: 'You already have an account with this email — sign in instead (or use \u201cForgot my password\u201d).',
+    needEmail: 'Type your email above first',
+    rTitle: 'Choose a new password', rSub: 'You arrived from a secure link in your email — set your new password below.',
+    rGo: 'Save new password', rDone: 'Password updated ✓',
+    pfShipTitle: 'Shipping address', pfShipName: 'Recipient name', pfAddr1: 'Street address',
+    pfAddr2: 'Apt / unit (optional)', pfCity: 'City', pfState: 'State / province',
+    pfZip: 'ZIP / postal code', pfCountry: 'Country',
+    pfShipNote: 'Used to quote your real shipping — saving updates any of your orders that haven\u2019t shipped yet.',
+    pfShipIncomplete: 'To save a shipping address, fill at least street, city and ZIP — or clear all fields to remove it.',
+    pfShipCleared: 'Shipping address removed ✓'
   }, es: {
     stages: ['Nueva solicitud', 'Revisión de cotización', 'En proceso', 'Lista', 'Enviada'],
     aTitle: 'Mis pedidos', aSub: 'Inicia sesión para ver tus piezas, escribirle al estudio y aprobar tu pieza terminada. El enlace de tu correo también funciona — sin cuenta.',
@@ -289,7 +331,22 @@
     rvSend: 'Enviar mi reseña', rvThanks: '¡Gracias por tu reseña! 💗', rvPick: 'Primero toca las estrellas',
     pfTitle: 'Mi perfil', pfName: 'Nombre', pfLang: 'Idioma preferido',
     pfMarketing: 'Avísame de nuevos drops y noticias del estudio', pfSave: 'Guardar perfil', pfSaved: 'Guardado ✓',
-    pfPass: 'Nueva contraseña (mín. 8 caracteres)', pfPassSave: 'Cambiar contraseña', pfPassDone: 'Contraseña cambiada ✓'
+    pfPass: 'Nueva contraseña (mín. 8 caracteres)', pfPassSave: 'Cambiar contraseña', pfPassDone: 'Contraseña cambiada ✓',
+    aTitleIn: 'Hola de nuevo 👋', aTitleUp: 'Crea tu cuenta',
+    aSubIn: 'Inicia sesión para ver tus piezas, escribirle al estudio y aprobar tu pieza terminada. El enlace de tu correo también funciona — sin cuenta.',
+    aSubUp: '¿Primera vez? Usa el mismo correo de tu compra y todas tus piezas aparecen automáticamente. Tu navegador puede sugerir una contraseña segura.',
+    pass2: 'Confirma tu contraseña', passMismatch: 'Las contraseñas no coinciden',
+    forgot: 'Olvidé mi contraseña', resetSent: 'Te enviamos un enlace para restablecerla — revisa tu correo 💌',
+    aExists: 'Ya tienes una cuenta con este correo — inicia sesión (o usa \u201cOlvidé mi contraseña\u201d).',
+    needEmail: 'Primero escribe tu correo arriba',
+    rTitle: 'Elige una nueva contraseña', rSub: 'Llegaste desde un enlace seguro de tu correo — escribe tu nueva contraseña.',
+    rGo: 'Guardar nueva contraseña', rDone: 'Contraseña actualizada ✓',
+    pfShipTitle: 'Dirección de envío', pfShipName: 'Nombre de quien recibe', pfAddr1: 'Calle y número',
+    pfAddr2: 'Interior / depto (opcional)', pfCity: 'Ciudad', pfState: 'Estado / provincia',
+    pfZip: 'Código postal', pfCountry: 'País',
+    pfShipNote: 'Se usa para cotizar tu envío real — al guardar se actualizan tus pedidos que aún no se envían.',
+    pfShipIncomplete: 'Para guardar la dirección llena al menos calle, ciudad y código postal — o deja todo vacío para quitarla.',
+    pfShipCleared: 'Dirección de envío eliminada ✓'
   } };
   function t() { return STR[lang]; }
   function $(id) { return document.getElementById(id); }
@@ -306,18 +363,63 @@
         return j; }); });
   }
 
+  /* ---------- countries we ship to (mirrors create-checkout) ---------- */
+  var COUNTRIES = [
+    ['US', 'United States', 'Estados Unidos'], ['MX', 'México', 'México'], ['CA', 'Canada', 'Canadá'],
+    ['GB', 'United Kingdom', 'Reino Unido'], ['IE', 'Ireland', 'Irlanda'], ['FR', 'France', 'Francia'],
+    ['ES', 'Spain', 'España'], ['DE', 'Germany', 'Alemania'], ['IT', 'Italy', 'Italia'],
+    ['PT', 'Portugal', 'Portugal'], ['NL', 'Netherlands', 'Países Bajos'], ['BE', 'Belgium', 'Bélgica'],
+    ['CH', 'Switzerland', 'Suiza'], ['AT', 'Austria', 'Austria'], ['SE', 'Sweden', 'Suecia'],
+    ['NO', 'Norway', 'Noruega'], ['DK', 'Denmark', 'Dinamarca'], ['FI', 'Finland', 'Finlandia'],
+    ['PL', 'Poland', 'Polonia'], ['CZ', 'Czechia', 'Chequia'], ['AU', 'Australia', 'Australia'],
+    ['NZ', 'New Zealand', 'Nueva Zelanda'], ['JP', 'Japan', 'Japón'], ['KR', 'South Korea', 'Corea del Sur'],
+    ['SG', 'Singapore', 'Singapur'], ['BR', 'Brazil', 'Brasil'], ['AR', 'Argentina', 'Argentina'],
+    ['CL', 'Chile', 'Chile'], ['CO', 'Colombia', 'Colombia'], ['CR', 'Costa Rica', 'Costa Rica'],
+    ['PA', 'Panama', 'Panamá'], ['DO', 'Dominican Republic', 'República Dominicana'], ['PR', 'Puerto Rico', 'Puerto Rico']];
+  function fillCountries() {
+    var sel = $('pf-country');
+    if (!sel) return;
+    var keep = sel.value || 'US';
+    sel.innerHTML = COUNTRIES.map(function (c) {
+      return '<option value="' + c[0] + '">' + esc(lang === 'es' ? c[2] : c[1]) + '</option>';
+    }).join('');
+    sel.value = keep;
+  }
+
   /* ---------- static labels ---------- */
   function applyLabels() {
     $('l-en').classList.toggle('on', lang === 'en');
     $('l-es').classList.toggle('on', lang === 'es');
-    $('a-title').textContent = t().aTitle;
-    $('a-sub').textContent = t().aSub;
+    var up = state.mode === 'signup';
+    $('a-title').textContent = up ? t().aTitleUp : t().aTitleIn;
+    $('a-sub').textContent = up ? t().aSubUp : t().aSubIn;
     $('tab-signin').textContent = t().signin;
     $('tab-signup').textContent = t().signup;
     $('a-email').placeholder = t().email;
     $('a-pass').placeholder = t().pass;
-    $('a-go').textContent = state.mode === 'signin' ? t().signin : t().signup;
+    $('a-pass2').placeholder = t().pass2;
+    // browsers offer a generated password only on new-password fields
+    $('a-pass').setAttribute('autocomplete', up ? 'new-password' : 'current-password');
+    $('a-pass2').hidden = !up;
+    $('a-forgot').textContent = t().forgot;
+    $('a-forgot').hidden = up;
+    $('a-go').textContent = up ? t().signup : t().signin;
     $('a-note').textContent = t().aNote;
+    $('r-title').textContent = t().rTitle;
+    $('r-sub').textContent = t().rSub;
+    $('r-pass').placeholder = t().pass;
+    $('r-pass2').placeholder = t().pass2;
+    $('r-go').textContent = t().rGo;
+    $('pf-ship-title').textContent = t().pfShipTitle;
+    $('pf-ship-note').textContent = t().pfShipNote;
+    $('pf-shipname-l').textContent = t().pfShipName;
+    $('pf-addr1-l').textContent = t().pfAddr1;
+    $('pf-addr2-l').textContent = t().pfAddr2;
+    $('pf-city-l').textContent = t().pfCity;
+    $('pf-state-l').textContent = t().pfState;
+    $('pf-zip-l').textContent = t().pfZip;
+    $('pf-country-l').textContent = t().pfCountry;
+    fillCountries();
     $('list-title').textContent = t().listTitle;
     $('btn-signout').textContent = t().signout;
     $('t-title').textContent = t().tTitle;
@@ -341,7 +443,7 @@
 
   /* ---------- views ---------- */
   function show(view) {
-    ['v-access', 'v-list', 'v-order'].forEach(function (v) { $(v).hidden = v !== view; });
+    ['v-access', 'v-reset', 'v-list', 'v-order'].forEach(function (v) { $(v).hidden = v !== view; });
   }
 
   function renderOrder() {
@@ -478,7 +580,7 @@
   function renderList() {
     $('order-list').innerHTML = state.orders.map(function (o, i) {
       return '<div class="order-row" data-i="' + i + '">' +
-        '<img src="' + esc(o.img) + '" alt="" style="width:44px;height:44px;border-radius:10px;object-fit:cover">' +
+        '<img src="' + esc(o.img_url || o.img) + '" alt="" style="width:44px;height:44px;border-radius:10px;object-fit:cover">' +
         '<div style="flex:1"><div class="item">' + esc(o.item) + '</div>' +
         '<span class="code">' + esc(o.code) + '</span></div>' +
         '<span class="chip ' + (o.stage >= 4 ? 'green' : 'pink') + '">' + esc(t().stages[o.stage]) + '</span></div>';
@@ -521,10 +623,14 @@
   $('tab-signin').addEventListener('click', function () { state.mode = 'signin'; $('tab-signin').classList.add('on'); $('tab-signup').classList.remove('on'); applyLabels(); });
   $('tab-signup').addEventListener('click', function () { state.mode = 'signup'; $('tab-signup').classList.add('on'); $('tab-signin').classList.remove('on'); applyLabels(); });
 
-  $('a-go').addEventListener('click', function () {
+  $('auth-form').addEventListener('submit', function (ev) {
+    ev.preventDefault();
     var email = $('a-email').value.trim();
     var pass = $('a-pass').value;
     if (!email || pass.length < 8) { $('a-err').textContent = t().needAll; return; }
+    if (state.mode === 'signup' && pass !== $('a-pass2').value) {
+      $('a-err').textContent = t().passMismatch; return;
+    }
     if (!sb) { $('a-err').textContent = 'Accounts need the live backend.'; return; }
     $('a-go').disabled = true;
     var op = state.mode === 'signup'
@@ -533,8 +639,41 @@
     op.then(function (res) {
       $('a-go').disabled = false;
       if (res.error) { $('a-err').textContent = res.error.message; return; }
+      // Supabase quirk: signing up with an existing confirmed email returns a
+      // user with no identities and sends nothing — tell them to sign in
+      if (state.mode === 'signup' && res.data.user && res.data.user.identities && res.data.user.identities.length === 0) {
+        $('a-err').textContent = t().aExists;
+        return;
+      }
       if (res.data.session) afterAuth(res.data.session);
       else $('a-err').textContent = lang === 'es' ? 'Revisa tu correo para confirmar la cuenta.' : 'Check your email to confirm your account.';
+    });
+  });
+  $('a-forgot').addEventListener('click', function () {
+    var email = $('a-email').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { $('a-err').textContent = t().needEmail; return; }
+    if (!sb) { $('a-err').textContent = 'Accounts need the live backend.'; return; }
+    $('a-forgot').disabled = true;
+    sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/orders/' })
+      .then(function (res) {
+        $('a-forgot').disabled = false;
+        $('a-err').textContent = res.error ? res.error.message : t().resetSent;
+      });
+  });
+  $('reset-form').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var pw = $('r-pass').value;
+    if (pw.length < 8) { $('r-err').textContent = t().needAll; return; }
+    if (pw !== $('r-pass2').value) { $('r-err').textContent = t().passMismatch; return; }
+    $('r-go').disabled = true;
+    sb.auth.updateUser({ password: pw }).then(function (res) {
+      $('r-go').disabled = false;
+      if (res.error) { $('r-err').textContent = res.error.message; return; }
+      $('r-err').textContent = '';
+      $('r-go').textContent = t().rDone;
+      sb.auth.getSession().then(function (r2) {
+        if (r2.data.session) setTimeout(function () { afterAuth(r2.data.session); }, 900);
+      });
     });
   });
   $('btn-signout').addEventListener('click', function () {
@@ -639,15 +778,38 @@
       $('pf-name').value = res.prefs.display_name || '';
       $('pf-lang').value = res.prefs.lang || 'en';
       $('pf-marketing').checked = res.prefs.marketing !== false;
+      var st = res.prefs.ship_to || {};
+      $('pf-shipname').value = res.prefs.ship_name || '';
+      $('pf-addr1').value = st.line1 || '';
+      $('pf-addr2').value = st.line2 || '';
+      $('pf-city').value = st.city || '';
+      $('pf-state').value = st.state || '';
+      $('pf-zip').value = st.postal_code || '';
+      if (st.country) $('pf-country').value = st.country;
       $('pf-save').disabled = false;
     }).catch(function () { $('pf-err').textContent = 'Profile unavailable — reload to retry.'; });
   }
   $('pf-save').addEventListener('click', function () {
+    var shipTo = {
+      line1: $('pf-addr1').value.trim(),
+      line2: $('pf-addr2').value.trim(),
+      city: $('pf-city').value.trim(),
+      state: $('pf-state').value.trim(),
+      postal_code: $('pf-zip').value.trim(),
+      country: $('pf-country').value
+    };
+    var anyFilled = !!(shipTo.line1 || shipTo.line2 || shipTo.city || shipTo.state || shipTo.postal_code);
+    var complete = !!(shipTo.line1 && shipTo.city && shipTo.postal_code);
+    if (anyFilled && !complete) { $('pf-err').textContent = t().pfShipIncomplete; return; }
+    $('pf-err').textContent = '';
     $('pf-save').disabled = true;
     portal({ action: 'profile-set', prefs: {
       display_name: $('pf-name').value.trim(),
       lang: $('pf-lang').value,
-      marketing: $('pf-marketing').checked
+      marketing: $('pf-marketing').checked,
+      ship_name: $('pf-shipname').value.trim(),
+      ship_to: anyFilled ? shipTo : null,
+      ship_clear: !anyFilled
     } }).then(function () {
       $('pf-save').disabled = false;
       $('pf-err').textContent = '';
@@ -729,13 +891,18 @@
       $('a-err').textContent = e.message === 'request failed' ? t().wrongLink : e.message;
     });
   } else if (sb) {
+    var isRecovery = /type=recovery/.test(location.hash);
+    sb.auth.onAuthStateChange(function (ev) {
+      if (ev === 'PASSWORD_RECOVERY') show('v-reset');
+    });
     sb.auth.getSession().then(function (res) {
-      if (res.data.session) afterAuth(res.data.session);
+      if (isRecovery) show('v-reset');
+      else if (res.data.session) afterAuth(res.data.session);
       else show('v-access');
     });
   } else show('v-access');
 })();
 </script>
-<script src="/js/lulu-chat.js?v=20260731d" defer></script>
+<script src="/js/lulu-chat.js?v=20260731e" defer></script>
 </body>
 </html>

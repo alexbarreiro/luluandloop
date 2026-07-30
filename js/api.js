@@ -447,10 +447,28 @@
         return sb().from('orders').select('*').eq('pending', false)
           .order('created_at', { ascending: false }).then(function (r) {
             if (r.error) fail(r.error);
-            return r.data.map(function (o) {
+            var orders = r.data.map(function (o) {
               o.artisan_id = o.artisan_id || '';
               return o;
             });
+            // Effective order picture: approved final photo > AI concept > stock img
+            var paths = [];
+            orders.forEach(function (o) {
+              var p = o.photo_path || o.concept_path;
+              if (p) paths.push(p);
+            });
+            if (!paths.length) return orders;
+            return sb().storage.from('evidence').createSignedUrls(paths, 3600).then(function (res) {
+              var byPath = {};
+              (res.data || []).forEach(function (u) {
+                if (u.signedUrl) byPath[u.path] = u.signedUrl;
+              });
+              orders.forEach(function (o) {
+                var p = o.photo_path || o.concept_path;
+                if (p && byPath[p]) o.img = byPath[p];
+              });
+              return orders;
+            }).catch(function () { return orders; }); // stock images are a fine fallback
           });
       },
       updateOrder: function (code, patch) {

@@ -91,13 +91,16 @@
     aiDesignReady: 'Design ready — sketching it now…',
     fColors: 'Colors', fColorsPh: 'dusty pink, cream, sage…', fRef: 'Reference', fRefPh: 'Drop a photo or sketch',
     optional: '(optional)', fName: 'Your name', fEmail: 'Email',
+    shipToTitle: 'Shipping address — so we can quote real shipping when your piece is ready',
+    fAddr1: 'Street address', fAddr2: 'Apt / unit (optional)', fCity: 'City',
+    fState: 'State / province', fZip: 'ZIP / postal code', fCountry: 'Country',
     fRush: '⚡ Rush my piece', fRushSub: '+30% · jumps the queue, −40% wait',
     estTitle: 'Your estimate', qBase: 'Base price', qRush: 'Rush — jumps the queue', qTotal: 'Total',
     turnLabel: 'Estimated time', contBtn: 'Continue to deposit', contHint: 'Describe your idea to continue',
     estNote: 'You only pay the deposit today. Lulu confirms your final quote within 24h — if anything changes, you approve it first.',
     s3Title: 'Deposit checkout', s3Secure: 'Secure', s3Card: 'Card information', s3Demo: 'demo — no real charge',
     s3Live: 'secure payment by Stripe — right here on our site',
-    payNow: 'Pay', processing: 'Processing…', payHint: 'Add your name and email to continue',
+    payNow: 'Pay', processing: 'Processing…', payHint: 'Add your name, email and shipping address to continue',
     payError: 'Something went wrong starting the payment — please try again.',
     balancePaidMsg: '¡Gracias! Balance received — your piece ships next. 🎁',
     canceledMsg: 'Payment canceled — your design is safe below, try again when ready.',
@@ -169,13 +172,16 @@
     aiDesignReady: 'Diseño listo — dibujando el boceto…',
     fColors: 'Colores', fColorsPh: 'rosa viejo, crema, salvia…', fRef: 'Referencia', fRefPh: 'Sube una foto o boceto',
     optional: '(opcional)', fName: 'Tu nombre', fEmail: 'Correo',
+    shipToTitle: 'Dirección de envío — para cotizar el envío real cuando tu pieza esté lista',
+    fAddr1: 'Calle y número', fAddr2: 'Interior / depto (opcional)', fCity: 'Ciudad',
+    fState: 'Estado / provincia', fZip: 'Código postal', fCountry: 'País',
     fRush: '⚡ Pieza urgente', fRushSub: '+30% · se adelanta en la fila, −40% de espera',
     estTitle: 'Tu estimado', qBase: 'Precio base', qRush: 'Urgente — se adelanta', qTotal: 'Total',
     turnLabel: 'Tiempo estimado', contBtn: 'Continuar al anticipo', contHint: 'Describe tu idea para continuar',
     estNote: 'Hoy solo pagas el anticipo. Lulu confirma tu cotización final en 24h — si algo cambia, tú lo apruebas primero.',
     s3Title: 'Pago del anticipo', s3Secure: 'Seguro', s3Card: 'Datos de tarjeta', s3Demo: 'demo — sin cargo real',
     s3Live: 'pago seguro con Stripe — sin salir de nuestro sitio',
-    payNow: 'Pagar', processing: 'Procesando…', payHint: 'Agrega tu nombre y correo para continuar',
+    payNow: 'Pagar', processing: 'Procesando…', payHint: 'Agrega tu nombre, correo y dirección de envío para continuar',
     payError: 'Algo falló al iniciar el pago — inténtalo de nuevo.',
     balancePaidMsg: '¡Gracias! Saldo recibido — tu pieza se envía pronto. 🎁',
     canceledMsg: 'Pago cancelado — tu diseño sigue abajo, inténtalo cuando quieras.',
@@ -250,7 +256,8 @@
     orderCode: null,
     checkoutHint: null, // null | 'validate' | 'canceled' | 'error'
     mpane: 1, // mobile sub-step within step 1 (1 category · 2 size · 3 details · 4 estimate)
-    form: { cat: 'dolls', size: 1, colors: '', palette: [], desc: '', name: '', email: '', rush: false, refName: '' },
+    form: { cat: 'dolls', size: 1, colors: '', palette: [], desc: '', name: '', email: '', rush: false, refName: '',
+      addr1: '', addr2: '', city: '', region: '', zip: '', country: 'US' },
     conceptPath: null, conceptUrl: null
   };
   if (state.lang !== 'en' && state.lang !== 'es') state.lang = 'en';
@@ -621,6 +628,29 @@
     document.body.style.overflow = '';
   }
 
+  // Countries we ship to (mirrors create-checkout's allowed list)
+  var COUNTRIES = [
+    ['US', 'United States', 'Estados Unidos'], ['MX', 'México', 'México'], ['CA', 'Canada', 'Canadá'],
+    ['GB', 'United Kingdom', 'Reino Unido'], ['IE', 'Ireland', 'Irlanda'], ['FR', 'France', 'Francia'],
+    ['ES', 'Spain', 'España'], ['DE', 'Germany', 'Alemania'], ['IT', 'Italy', 'Italia'],
+    ['PT', 'Portugal', 'Portugal'], ['NL', 'Netherlands', 'Países Bajos'], ['BE', 'Belgium', 'Bélgica'],
+    ['CH', 'Switzerland', 'Suiza'], ['AT', 'Austria', 'Austria'], ['SE', 'Sweden', 'Suecia'],
+    ['NO', 'Norway', 'Noruega'], ['DK', 'Denmark', 'Dinamarca'], ['FI', 'Finland', 'Finlandia'],
+    ['PL', 'Poland', 'Polonia'], ['CZ', 'Czechia', 'Chequia'], ['AU', 'Australia', 'Australia'],
+    ['NZ', 'New Zealand', 'Nueva Zelanda'], ['JP', 'Japan', 'Japón'], ['KR', 'South Korea', 'Corea del Sur'],
+    ['SG', 'Singapore', 'Singapur'], ['BR', 'Brazil', 'Brasil'], ['AR', 'Argentina', 'Argentina'],
+    ['CL', 'Chile', 'Chile'], ['CO', 'Colombia', 'Colombia'], ['CR', 'Costa Rica', 'Costa Rica'],
+    ['PA', 'Panama', 'Panamá'], ['DO', 'Dominican Republic', 'República Dominicana'], ['PR', 'Puerto Rico', 'Puerto Rico']];
+  function fillCountries() {
+    var sel = $('f-country');
+    if (!sel) return;
+    var keep = state.form.country || 'US';
+    sel.innerHTML = COUNTRIES.map(function (c) {
+      return '<option value="' + c[0] + '">' + esc(state.lang === 'es' ? c[2] : c[1]) + '</option>';
+    }).join('');
+    sel.value = keep;
+  }
+
   function bind() {
     $('lang-en').addEventListener('click', function () { setLang('en'); });
     $('lang-es').addEventListener('click', function () { setLang('es'); });
@@ -819,14 +849,27 @@
 
     $('f-name').addEventListener('input', function (e) { state.form.name = e.target.value; e.target.classList.remove('invalid'); });
     $('f-email').addEventListener('input', function (e) { state.form.email = e.target.value; e.target.classList.remove('invalid'); });
+    [['f-addr1', 'addr1'], ['f-addr2', 'addr2'], ['f-city', 'city'], ['f-state', 'region'], ['f-zip', 'zip']].forEach(function (p) {
+      $(p[0]).addEventListener('input', function (e) { state.form[p[1]] = e.target.value; e.target.classList.remove('invalid'); });
+    });
+    $('f-country').addEventListener('change', function (e) { state.form.country = e.target.value; });
+    fillCountries();
 
     $('btn-pay').addEventListener('click', function () {
       if (state.paying) return;
       var nameOk = !!state.form.name.trim();
       var emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.form.email.trim());
-      if (!nameOk || !emailOk) {
+      var addrOk = !!state.form.addr1.trim();
+      var cityOk = !!state.form.city.trim();
+      var zipOk = !!state.form.zip.trim();
+      var regionOk = state.form.country !== 'US' || !!state.form.region.trim();
+      if (!nameOk || !emailOk || !addrOk || !cityOk || !zipOk || !regionOk) {
         $('f-name').classList.toggle('invalid', !nameOk);
         $('f-email').classList.toggle('invalid', !emailOk);
+        $('f-addr1').classList.toggle('invalid', !addrOk);
+        $('f-city').classList.toggle('invalid', !cityOk);
+        $('f-zip').classList.toggle('invalid', !zipOk);
+        $('f-state').classList.toggle('invalid', !regionOk);
         state.checkoutHint = 'validate';
         renderCheckout();
         return;
@@ -843,9 +886,18 @@
           sessionStorage.setItem('luluandloop.pendingForm',
             JSON.stringify({ form: state.form, lang: state.lang }));
         } catch (e) { /* ignore */ }
+        try { localStorage.setItem('luluandloop.lastEmail', state.form.email.trim()); } catch (e) { /* ignore */ }
         window.LuluAPI.createCheckout({
           name: state.form.name.trim(),
           email: state.form.email.trim(),
+          address: {
+            line1: state.form.addr1.trim(),
+            line2: state.form.addr2.trim() || undefined,
+            city: state.form.city.trim(),
+            state: state.form.region.trim() || undefined,
+            postal_code: state.form.zip.trim(),
+            country: state.form.country
+          },
           cat_id: q.cat.id,
           size_idx: Math.min(state.form.size, q.cat.sizes.length - 1),
           rush: state.form.rush,
@@ -914,6 +966,7 @@
   }
 
   function setLang(l) {
+    setTimeout(fillCountries, 0);
     setTimeout(function () { try { window.dispatchEvent(new Event('lulu-lang')); } catch (e) { /* ignore */ } }, 0);
     state.lang = l;
     lsSet('luluandloop.lang', l);
@@ -942,6 +995,12 @@
         $('f-rush').checked = !!state.form.rush;
         $('f-name').value = state.form.name || '';
         $('f-email').value = state.form.email || '';
+        $('f-addr1').value = state.form.addr1 || '';
+        $('f-addr2').value = state.form.addr2 || '';
+        $('f-city').value = state.form.city || '';
+        $('f-state').value = state.form.region || '';
+        $('f-zip').value = state.form.zip || '';
+        if (state.form.country) { fillCountries(); $('f-country').value = state.form.country; }
       }
     } catch (e) { /* ignore */ }
   }

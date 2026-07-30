@@ -84,6 +84,28 @@ Deno.serve(async (req) => {
   if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return bad("name and valid email required");
   if (!desc) return bad("description required");
 
+  // Shipping address collected in OUR wizard. When present we pass it straight
+  // to Stripe (payment_intent_data.shipping) so the embedded sheet doesn't ask
+  // again; when absent (chat / app flow) Stripe collects it in the sheet.
+  const ALLOWED_COUNTRIES = [
+    "US", "CA", "MX", "GB", "IE", "FR", "ES", "DE", "IT", "PT", "NL", "BE",
+    "CH", "AT", "SE", "NO", "DK", "FI", "PL", "CZ", "AU", "NZ", "JP", "KR",
+    "SG", "BR", "AR", "CL", "CO", "CR", "PA", "DO", "PR",
+  ];
+  const rawAddr = (body.address ?? null) as Record<string, unknown> | null;
+  const field = (k: string, max = 120) => String(rawAddr?.[k] ?? "").trim().slice(0, max);
+  let address: Record<string, string> | null = null;
+  if (rawAddr) {
+    const a = {
+      line1: field("line1", 200), line2: field("line2", 200), city: field("city"),
+      state: field("state"), postal_code: field("postal_code", 20),
+      country: field("country", 2).toUpperCase(),
+    };
+    if (a.line1 && a.city && a.postal_code && ALLOWED_COUNTRIES.includes(a.country)) {
+      address = a;
+    }
+  }
+
   // Everything financial is derived server-side from the catalog
   const cat = CATALOG[catId];
   if (!cat) return bad("unknown category");
@@ -106,6 +128,8 @@ Deno.serve(async (req) => {
       code, customer: name, email, item, size_label: sizeLabel,
       desc_text: desc, colors, rush, lang, price, deposit, balance,
       stage: 0, pending: true, img: cat.img, concept_path: conceptPath,
+      shipping_name: address ? name : null,
+      shipping_address: address,
     })
     .select("id, code")
     .single();
@@ -125,15 +149,29 @@ Deno.serve(async (req) => {
     ui_mode: "embedded",
     payment_method_types: ["card"],
     customer_email: email,
-    // Collect the shipping address up front so the studio can quote real
-    // shipping (Shippo) when the piece is ready
-    shipping_address_collection: {
-      allowed_countries: [
-        "US", "CA", "MX", "GB", "IE", "FR", "ES", "DE", "IT", "PT", "NL", "BE",
-        "CH", "AT", "SE", "NO", "DK", "FI", "PL", "CZ", "AU", "NZ", "JP", "KR",
-        "SG", "BR", "AR", "CL", "CO", "CR", "PA", "DO", "PR",
-      ],
-    },
+    // Address from our wizard → attach to the payment and skip Stripe's own
+    // collection; otherwise (chat / app flow) Stripe collects it in the sheet
+    ...(address
+      ? {
+        payment_intent_data: {
+          shipping: {
+            name,
+            address: {
+              line1: address.line1,
+              ...(address.line2 ? { line2: address.line2 } : {}),
+              city: address.city,
+              ...(address.state ? { state: address.state } : {}),
+              postal_code: address.postal_code,
+              country: address.country,
+            },
+          },
+        },
+      }
+      : {
+        shipping_address_collection: {
+          allowed_countries: ALLOWED_COUNTRIES as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry[],
+        },
+      }),
     line_items: [{
       quantity: 1,
       price_data: {

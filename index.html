@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,400;0,6..12,600;0,6..12,700;0,6..12,800;0,6..12,900;1,6..12,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/site.css?v=20260731d">
+<link rel="stylesheet" href="/css/site.css?v=20260731e">
 </head>
 <body>
 
@@ -251,10 +251,31 @@
         <div class="checkout-line last" id="pay-recap2"></div>
         <div class="pay-fields">
           <label class="pay-field"><span data-i18n="fName">Your name</span>
-            <input id="f-name" autocomplete="name" placeholder="Ana García">
+            <input id="f-name" name="name" autocomplete="name" placeholder="Ana García">
           </label>
           <label class="pay-field"><span data-i18n="fEmail">Email</span>
-            <input id="f-email" type="email" autocomplete="email" placeholder="ana@email.com">
+            <input id="f-email" name="email" type="email" autocomplete="email" placeholder="ana@email.com">
+          </label>
+        </div>
+        <div class="addr-title" data-i18n="shipToTitle">Shipping address</div>
+        <div class="pay-fields addr-fields">
+          <label class="pay-field addr-wide"><span data-i18n="fAddr1">Street address</span>
+            <input id="f-addr1" name="address-line1" autocomplete="shipping address-line1" placeholder="123 Main St">
+          </label>
+          <label class="pay-field"><span data-i18n="fAddr2">Apt / unit <span class="opt">(optional)</span></span>
+            <input id="f-addr2" name="address-line2" autocomplete="shipping address-line2">
+          </label>
+          <label class="pay-field"><span data-i18n="fCity">City</span>
+            <input id="f-city" name="city" autocomplete="shipping address-level2">
+          </label>
+          <label class="pay-field"><span data-i18n="fState">State / province</span>
+            <input id="f-state" name="state" autocomplete="shipping address-level1">
+          </label>
+          <label class="pay-field"><span data-i18n="fZip">ZIP / postal code</span>
+            <input id="f-zip" name="postal-code" autocomplete="shipping postal-code">
+          </label>
+          <label class="pay-field addr-wide"><span data-i18n="fCountry">Country</span>
+            <select id="f-country" name="country" autocomplete="shipping country"></select>
           </label>
         </div>
         <label class="card-group"><span data-i18n="s3Card">Card information</span>
@@ -313,9 +334,9 @@
   </div>
 </div>
 
-<script src="/js/config.js?v=20260731d"></script>
-<script src="/js/api.js?v=20260731d"></script>
-<script src="/js/site.js?v=20260731d"></script>
-<script src="/js/lulu-chat.js?v=20260731d" defer></script>
+<script src="/js/config.js?v=20260731e"></script>
+<script src="/js/api.js?v=20260731e"></script>
+<script src="/js/site.js?v=20260731e"></script>
+<script src="/js/lulu-chat.js?v=20260731e" defer></script>
 </body>
 </html>

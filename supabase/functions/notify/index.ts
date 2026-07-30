@@ -40,12 +40,16 @@ async function send(to: string, subject: string, html: string, log?: { order_id?
     body: JSON.stringify({ from: FROM, to: [to], subject, html }),
   });
   const ok = r.status < 300;
-  if (ok && log) {
+  const bodyText = await r.text();
+  if (log) {
+    // failures are logged too — a silent Resend rejection (e.g. unverified
+    // domain sandbox) must be visible in the studio, not lost
     await admin.from("email_log").insert({
       order_id: log.order_id ?? null, to_email: to, kind: log.kind, subject,
+      status: ok ? "sent" : "failed", error: ok ? null : bodyText.slice(0, 500),
     });
   }
-  return { status: r.status, body: await r.text() };
+  return { status: r.status, body: bodyText };
 }
 
 const O_FIELDS = "id, code, customer, email, item, lang, price, deposit, balance, shipping, " +
@@ -239,6 +243,37 @@ Deno.serve(async (req) => {
            <p style="font-size:12px;color:#B6B1BC;margin-top:14px">If anything didn't arrive perfect, just reply — we'll make it right.</p>`),
       { order_id: oid, kind });
     await markSent(res as { status?: number });
+    return Response.json({ ok: true, res });
+  }
+
+  if (kind === "work_started") {
+    const res = await send(to,
+      es ? `¡Manos a la obra! Tu pieza está en proceso 🧶 · ${order.code}` : `Hands on yarn! Your piece is in progress 🧶 · ${order.code}`,
+      shell(es
+        ? `<p style="font-size:15px">¡Hola ${first}!</p>
+           <p style="font-size:15px;line-height:1.6">¡Buenas noticias! Tu <b>${esc(order.item)}</b> ya está en las manos de nuestras artesanas — puntada a puntada, está cobrando vida. 🧶</p>
+           <p style="font-size:15px;line-height:1.6">Te iremos contando el avance, y desde tu portal puedes escribirnos cuando quieras:</p>
+           ${btn(portal, "Ver mi pedido →")}`
+        : `<p style="font-size:15px">Hi ${first}!</p>
+           <p style="font-size:15px;line-height:1.6">Good news! Your <b>${esc(order.item)}</b> is now in our artisans' hands — stitch by stitch, it's coming to life. 🧶</p>
+           <p style="font-size:15px;line-height:1.6">We'll keep you posted, and you can message us any time from your portal:</p>
+           ${btn(portal, "View my order →")}`),
+      { order_id: oid, kind });
+    return Response.json({ ok: true, res });
+  }
+
+  if (kind === "balance_received") {
+    const total = (Number(order.balance) + (Number(order.shipping) || 0)).toFixed(2);
+    const res = await send(to,
+      es ? `Saldo recibido ✓ tu pieza se prepara para viajar 🎁 · ${order.code}` : `Balance received ✓ your piece is getting ready to travel 🎁 · ${order.code}`,
+      shell(es
+        ? `<p style="font-size:15px">¡Gracias, ${first}!</p>
+           <p style="font-size:15px;line-height:1.6">Recibimos tu saldo de <b>$${esc(total)}</b> por <b>${esc(order.item)}</b> (${esc(order.code)}). Tu pieza recibe sus últimos toques y se envía en cuanto imprimamos la etiqueta — el rastreo te llega por correo.</p>
+           ${btn(portal, "Ver mi pedido →")}`
+        : `<p style="font-size:15px">Thank you, ${first}!</p>
+           <p style="font-size:15px;line-height:1.6">We received your <b>$${esc(total)}</b> balance for <b>${esc(order.item)}</b> (${esc(order.code)}). Your piece is getting its final touches and ships as soon as we print the label — tracking will land in your inbox.</p>
+           ${btn(portal, "View my order →")}`),
+      { order_id: oid, kind });
     return Response.json({ ok: true, res });
   }
 

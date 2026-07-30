@@ -276,6 +276,11 @@
       })
     }).then(function (r) { return r.json(); }).then(function (res) {
       busy = false;
+      // The server tells us the ids it stored for this round-trip; mark them
+      // seen and advance the poll cursor so the 6s history poll doesn't
+      // re-append the same pair (that was the double-message bug).
+      ((res && res.message_ids) || []).forEach(function (id) { seenIds[id] = true; });
+      if (res && res.last_at) lastAt = res.last_at;
       var m = { role: 'lulu', text: (res && res.reply) || '…' };
       (res && res.actions || []).forEach(function (a) {
         if (a.type === 'concept') m.concept = a.url;

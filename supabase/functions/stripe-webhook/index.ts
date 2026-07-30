@@ -36,7 +36,8 @@ Deno.serve(async (req) => {
     let dbError = null;
     if (orderId && kind === "deposit") {
       // Stripe surfaces the collected address under shipping_details
-      // (or collected_information on newer API versions)
+      // (or collected_information on newer API versions). When the wizard
+      // already collected the address, Stripe has none — keep ours.
       const ship = (session as unknown as Record<string, any>).shipping_details ??
         (session as unknown as Record<string, any>).collected_information?.shipping_details ?? null;
       const { error } = await supabase.from("orders").update({
@@ -44,10 +45,29 @@ Deno.serve(async (req) => {
         stage: 0, // New request — deposit is always paid upfront
         deposit_paid_at: new Date().toISOString(),
         deposit_ref: ref,
-        shipping_name: ship?.name ?? null,
-        shipping_address: ship?.address ?? null,
+        ...(ship?.address ? { shipping_name: ship?.name ?? null, shipping_address: ship.address } : {}),
       }).eq("id", orderId).eq("pending", true); // idempotent: no-op on retries
       dbError = error;
+      // Keep the address on the customer record for reuse — but never clobber
+      // an existing saved address (checkout emails are unverified; the portal
+      // profile is the authoritative way to CHANGE a saved address)
+      if (!error) {
+        const { data: o } = await supabase.from("orders")
+          .select("email, shipping_name, shipping_address").eq("id", orderId).single();
+        if (o?.email && o.shipping_address) {
+          const key = String(o.email).toLowerCase();
+          const { data: existing } = await supabase.from("customer_prefs")
+            .select("ship_to").eq("email", key).maybeSingle();
+          if (!existing?.ship_to) {
+            await supabase.from("customer_prefs").upsert({
+              email: key,
+              ship_name: o.shipping_name ?? null,
+              ship_to: o.shipping_address,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: "email" });
+          }
+        }
+      }
     } else if (orderId && kind === "balance") {
       const { error } = await supabase.from("orders").update({
         balance_paid_at: new Date().toISOString(),

@@ -146,6 +146,9 @@ export default function App() {
           jwt: session ? session.access_token : undefined,
         }),
       }).then((x) => x.json());
+      // mark this round-trip's rows as seen so the 7s poll doesn't duplicate them
+      for (const id of r.message_ids || []) seenRef.current[id] = true;
+      if (r.last_at) lastAtRef.current = r.last_at;
       const bubble = { role: 'lulu', text: r.reply || '…' };
       for (const a of r.actions || []) {
         if (a.type === 'concept') bubble.concept = a.url;
