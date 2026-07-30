@@ -1,12 +1,12 @@
-// create-balance-link — staff-only: creates a Stripe Checkout link for the
-// 60% balance + shipping of an order and stores it on the order row.
+// create-balance-link — staff-only: locks in the shipping amount for the
+// 60% balance and stores the customer's PORTAL link on the order row.
+// The portal collects the balance with Stripe Embedded Checkout, so the
+// customer never leaves luluandloop.com (the session itself is created at
+// pay time by order-portal's `pay-balance` action, which mirrors the
+// shipping precedence below).
 // Deployed with JWT verification ON; additionally requires an active staff profile.
-import Stripe from "npm:stripe@14";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
-  apiVersion: "2023-10-16",
-});
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -70,38 +70,18 @@ Deno.serve(async (req) => {
   else if (order.shipping != null) effectiveShipping = Number(order.shipping);
   else if (Number.isFinite(rateAmount)) effectiveShipping = Math.round(rateAmount * 100) / 100;
   else effectiveShipping = 0;
-  const total = Number(order.balance) + effectiveShipping;
-  const lang = order.lang === "es" ? "es" : "en";
-  const label = lang === "es"
-    ? `Saldo 60% + envío · ${order.item} · ${order.code}`
-    : `60% balance + shipping · ${order.item} · ${order.code}`;
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
-    customer_email: order.email ?? undefined,
-    line_items: [{
-      quantity: 1,
-      price_data: {
-        currency: "usd",
-        unit_amount: Math.round(total * 100),
-        product_data: { name: label },
-      },
-    }],
-    metadata: { kind: "balance", order_id: order.id, code: order.code },
-    locale: lang === "es" ? "es" : "en",
-    success_url: `${SITE_URL}/thanks/?kind=balance&code=${encodeURIComponent(order.code)}&lang=${lang}`,
-    cancel_url: `${SITE_URL}/orders/?code=${encodeURIComponent(order.code)}&t=${order.share_token}&lang=${lang}`,
-  });
+  const lang = order.lang === "es" ? "es" : "en";
+  const portalUrl =
+    `${SITE_URL}/orders/?code=${encodeURIComponent(order.code)}&t=${order.share_token}&lang=${lang}`;
 
   await admin.from("orders").update({
-    balance_url: session.url,
-    balance_session_id: session.id,
+    balance_url: portalUrl,
     balance_sent_at: new Date().toISOString(),
     shipping: effectiveShipping,
     // the courtesy flag only survives if the customer truly pays $0 shipping
     shipping_waived: order.shipping_waived && effectiveShipping === 0,
   }).eq("id", order.id);
 
-  return json({ url: session.url });
+  return json({ url: portalUrl, shipping: effectiveShipping });
 });

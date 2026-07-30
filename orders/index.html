@@ -90,7 +90,13 @@
     display:flex; align-items:center; justify-content:center; padding:18px; }
   .stripe-box { position:relative; background:#fff; border-radius:18px; width:min(480px,100%);
     max-height:92vh; overflow-y:auto; padding:14px; box-sizing:border-box; }
-  #stripe-close { position:absolute; top:10px; right:10px; z-index:2; border:1px solid var(--border);
+  .stripe-brand { display:flex; align-items:center; gap:10px; padding:10px 12px;
+    background:#FFF8F0; border:1px solid var(--border); border-radius:12px;
+    margin-bottom:10px; position:sticky; top:0; z-index:3; }
+  .stripe-brand-word { font-weight:900; font-size:16px; color:var(--ink); white-space:nowrap; }
+  .stripe-brand-word b { color:#E4657E; }
+  .stripe-brand-note { font-size:11px; font-weight:800; color:#9A4B60; line-height:1.3; }
+  #stripe-close { margin-left:auto; flex-shrink:0; border:1px solid var(--border);
     background:var(--card); border-radius:50%; width:32px; height:32px; cursor:pointer;
     font-size:14px; color:var(--muted); line-height:1; }
   #stripe-mount { min-height:420px; }
@@ -214,12 +220,16 @@
 
 <div id="stripe-modal" hidden>
   <div class="stripe-box">
-    <button id="stripe-close" aria-label="Close checkout">✕</button>
+    <div class="stripe-brand">
+      <span class="stripe-brand-word">Lulu <b>&amp;</b> Loop</span>
+      <span class="stripe-brand-note" id="stripe-brand-note">🔒 Pago seguro · nunca sales de luluandloop.com</span>
+      <button id="stripe-close" aria-label="Close checkout">✕</button>
+    </div>
     <div id="stripe-mount"></div>
   </div>
 </div>
 
-<script src="/js/config.js?v=20260730d"></script>
+<script src="/js/config.js?v=20260731a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
@@ -369,13 +379,8 @@
       if (o.balance_url && !o.balance_paid_at) {
         pb.style.display = 'block';
         pb.textContent = t().pay + ' · $' + (Number(o.balance) + (Number(o.shipping) || 0));
-        if (window.LULU_CONFIG && window.LULU_CONFIG.STRIPE_PK) {
-          pb.removeAttribute('href');           // pay without leaving the site
-          pb.onclick = function (ev) { ev.preventDefault(); payBalanceEmbedded(); };
-        } else {
-          pb.href = o.balance_url;              // fallback: Stripe-hosted page
-          pb.onclick = null;
-        }
+        pb.removeAttribute('href');             // always pay without leaving the site
+        pb.onclick = function (ev) { ev.preventDefault(); payBalanceEmbedded(); };
       } else pb.style.display = 'none';
     } else $('approval-card').hidden = true;
 
@@ -707,6 +712,9 @@
       });
   }
   $('stripe-close').addEventListener('click', closeEmbeddedCheckout);
+  $('stripe-brand-note').textContent = lang === 'es'
+    ? '🔒 Pago seguro · nunca sales de luluandloop.com'
+    : '🔒 Secure payment · you never leave luluandloop.com';
 
   /* ---------- boot ---------- */
   applyLabels();
@@ -726,6 +734,6 @@
   } else show('v-access');
 })();
 </script>
-<script src="/js/lulu-chat.js?v=20260730d" defer></script>
+<script src="/js/lulu-chat.js?v=20260731a" defer></script>
 </body>
 </html>

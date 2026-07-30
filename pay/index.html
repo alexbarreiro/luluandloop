@@ -19,7 +19,7 @@
 <body>
   <div class="top">
     <span class="word">Lulu <b>&amp;</b> Loop</span>
-    <span class="sub">🔒 Pago seguro con Stripe · sin salir de luluandloop.com</span>
+    <span class="sub" id="sub">🔒 Pago seguro · nunca sales de luluandloop.com</span>
   </div>
   <div id="mount"></div>
 <script src="/js/config.js"></script>
@@ -29,6 +29,11 @@
   'use strict';
   var params = new URLSearchParams(location.hash.slice(1));
   var cs = params.get('cs');
+  var hl = params.get('hl') || localStorage.getItem('luluandloop.lang') || 'es';
+  if (hl === 'en') {
+    document.documentElement.lang = 'en';
+    document.getElementById('sub').textContent = '🔒 Secure payment · you never leave luluandloop.com';
+  }
   var mount = document.getElementById('mount');
   if (!cs || !window.LULU_CONFIG || !window.LULU_CONFIG.STRIPE_PK || !window.Stripe) {
     mount.innerHTML = '<div class="err">Este enlace de pago no es válido o ya expiró — pídele uno nuevo a Lulu 💗</div>';

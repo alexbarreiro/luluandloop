@@ -115,13 +115,14 @@ Deno.serve(async (req) => {
     ? `Anticipo 40% · ${cat.es} · ${size.es} · ${code}`
     : `40% deposit · ${item} · ${code}`;
 
-  // Embedded mode keeps the customer on luluandloop.com (Stripe renders inside
-  // our page); hosted redirect remains the fallback when the publishable key
-  // isn't configured on the front end
+  // Every session is EMBEDDED — the customer never leaves luluandloop.com.
+  // Clients that mount Stripe themselves get the client_secret; everyone else
+  // (older cached pages, the mobile app) gets a URL to our own /pay page,
+  // which mounts the same embedded form on-domain.
   const embedded = body.embedded === true;
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
-    ...(embedded ? { ui_mode: "embedded" as const } : {}),
+    ui_mode: "embedded",
     payment_method_types: ["card"],
     customer_email: email,
     // Collect the shipping address up front so the studio can quote real
@@ -148,18 +149,16 @@ Deno.serve(async (req) => {
     }],
     metadata: { kind: "deposit", order_id: order.id, code, rush: String(rush) },
     locale: lang === "es" ? "es" : "en",
-    ...(embedded
-      ? { return_url: `${SITE_URL}/thanks/?kind=deposit&code=${encodeURIComponent(code)}&lang=${lang === "es" ? "es" : "en"}` }
-      : {
-        success_url: `${SITE_URL}/thanks/?kind=deposit&code=${encodeURIComponent(code)}&lang=${lang === "es" ? "es" : "en"}`,
-        cancel_url: `${SITE_URL}/?canceled=1#order`,
-      }),
+    return_url: `${SITE_URL}/thanks/?kind=deposit&code=${encodeURIComponent(code)}&lang=${lang === "es" ? "es" : "en"}`,
   });
 
   await supabase.from("orders").update({ deposit_session_id: session.id }).eq("id", order.id);
 
+  const payUrl = `${SITE_URL}/pay/#cs=${session.client_secret}&hl=${lang}`;
   return new Response(JSON.stringify(
-    embedded ? { client_secret: session.client_secret, code } : { url: session.url, code },
+    embedded
+      ? { client_secret: session.client_secret, code }
+      : { url: payUrl, code },
   ), {
     headers: { ...CORS, "Content-Type": "application/json" },
   });

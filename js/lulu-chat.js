@@ -227,7 +227,14 @@
         if (!wrap) {
           wrap = document.createElement('div');
           wrap.id = 'lulu-chat-stripe';
-          wrap.innerHTML = '<div class="box"><button class="x">✕</button><div class="mount"></div></div>';
+          wrap.innerHTML = '<div class="box">' +
+            '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#FFF8F0;' +
+            'border:1px solid #F0E2D8;border-radius:12px;margin-bottom:10px;position:sticky;top:0;z-index:3">' +
+            '<span style="font-weight:900;font-size:16px;color:#2A2A33;white-space:nowrap">Lulu <b style="color:#E4657E">&amp;</b> Loop</span>' +
+            '<span style="font-size:11px;font-weight:800;color:#9A4B60;line-height:1.3">' +
+            T('🔒 Secure payment · you never leave luluandloop.com', '🔒 Pago seguro · nunca sales de luluandloop.com') + '</span>' +
+            '<button class="x" style="position:static;margin-left:auto;flex-shrink:0">✕</button></div>' +
+            '<div class="mount"></div></div>';
           document.body.appendChild(wrap);
           wrap.querySelector('.x').addEventListener('click', function () {
             if (stripeCheckout) { try { stripeCheckout.destroy(); } catch (e) { /* ignore */ } stripeCheckout = null; }
