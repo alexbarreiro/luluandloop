@@ -9,8 +9,11 @@
   var cfg = window.LULU_CONFIG || {};
   if (!cfg.SUPABASE_URL) return; // demo mode: no agent backend
 
-  var ES = (document.documentElement.lang || 'en').indexOf('es') === 0 ||
-           (localStorage.getItem('luluandloop.lang') === 'es');
+  function detectES() {
+    try { if (localStorage.getItem('luluandloop.lang')) return localStorage.getItem('luluandloop.lang') === 'es'; } catch (e) { /* ignore */ }
+    return (document.documentElement.lang || 'en').indexOf('es') === 0;
+  }
+  var ES = detectES();
   function T(en, es) { return ES ? es : en; }
 
   var HELLO = {
@@ -456,6 +459,30 @@
     speakingBtn = btn;
     speechSynthesis.speak(u);
   }
+
+  function applyLang() {
+    var was = ES;
+    ES = detectES();
+    if (ES === was) return;
+    var sp = launch.querySelector('span');
+    if (sp) sp.textContent = T('Talk with Lulu', 'Habla con Lulu');
+    if (panel) {
+      panel.querySelector('.lc-sub').textContent = T('Lulu · always online 🧶', 'Lulu · siempre en línea 🧶');
+      inputEl.placeholder = T('Tell Lulu your idea…', 'Cuéntale tu idea a Lulu…');
+      typingEl.textContent = T('Lulu is typing…', 'Lulu está escribiendo…');
+      var mic = panel.querySelector('.lc-mic');
+      if (mic) mic.setAttribute('aria-label', T('Dictate', 'Dictar'));
+    }
+    // refresh the greeting if it's still the only message
+    if (messages.length === 1 && messages[0].role === 'lulu' && !messages[0].concept) {
+      messages[0].text = T("Hi! I'm Lulu 💗 Tell me what you'd love me to crochet — or ask me anything about your order.",
+        '¡Hola! Soy Lulu 💗 Cuéntame qué te gustaría que tejiera — o pregúntame lo que sea de tu pedido.');
+    }
+    render();
+  }
+  window.addEventListener('lulu-lang', applyLang);
+  window.addEventListener('storage', applyLang);
+  setInterval(applyLang, 1200); // catches toggles even without the event
 
   launch.addEventListener('click', openPanel);
   window.addEventListener('lulu-chat-open', openPanel);

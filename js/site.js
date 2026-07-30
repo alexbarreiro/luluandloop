@@ -909,6 +909,7 @@
   }
 
   function setLang(l) {
+    setTimeout(function () { try { window.dispatchEvent(new Event('lulu-lang')); } catch (e) { /* ignore */ } }, 0);
     state.lang = l;
     lsSet('luluandloop.lang', l);
     renderAll();

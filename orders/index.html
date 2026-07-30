@@ -219,7 +219,7 @@
   </div>
 </div>
 
-<script src="/js/config.js?v=20260730c"></script>
+<script src="/js/config.js?v=20260730d"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
@@ -502,6 +502,7 @@
 
   /* ---------- events ---------- */
   function setLang(l) {
+    setTimeout(function () { try { window.dispatchEvent(new Event('lulu-lang')); } catch (e) {} }, 0);
     lang = l;
     try { localStorage.setItem('luluandloop.lang', l); } catch (e) { /* ignore */ }
     applyLabels();
@@ -725,6 +726,6 @@
   } else show('v-access');
 })();
 </script>
-<script src="/js/lulu-chat.js?v=20260730c" defer></script>
+<script src="/js/lulu-chat.js?v=20260730d" defer></script>
 </body>
 </html>
