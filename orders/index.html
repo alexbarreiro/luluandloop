@@ -83,6 +83,16 @@
   .pay-line .ref { font-family:ui-monospace,Menlo,monospace; font-size:11px; color:var(--muted); width:100%; }
   .pay-line:last-of-type { border-bottom:none; }
   .courtesy { color:#3E6B4A; font-weight:800; }
+  #o-photo { width:72px; height:72px; border-radius:16px; object-fit:cover; border:1px solid var(--border); }
+  .pnav { position:fixed; left:0; right:0; bottom:0; z-index:60; display:flex; justify-content:space-around;
+    background:rgba(255,254,252,.97); backdrop-filter:blur(8px); border-top:1px solid var(--border);
+    padding:8px 10px calc(8px + env(safe-area-inset-bottom)); }
+  .pnav button, .pnav a { display:flex; flex-direction:column; align-items:center; gap:2px; border:none;
+    background:none; font:inherit; font-weight:800; font-size:11px; color:var(--t2); cursor:pointer;
+    padding:6px 18px; border-radius:12px; text-decoration:none; }
+  .pnav .pn-ico { font-size:19px; }
+  .pnav button.on { color:var(--pink); background:var(--soft); }
+  body.has-pnav .wrap { padding-bottom:150px; }
   .linkish { background:none; border:none; color:var(--pink); font:inherit; font-weight:800;
     font-size:13px; cursor:pointer; margin-top:12px; display:block; text-align:center; width:100%; }
   #invoice { display:none; }
@@ -151,13 +161,17 @@
 
   <!-- Order list (account mode) -->
   <div class="card" id="v-list" hidden>
+    <h2 id="list-title"></h2>
+    <div id="order-list"></div>
+  </div>
+
+  <!-- Profile (own tab, app-style) -->
+  <div class="card" id="v-profile" hidden>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-      <h2 id="list-title"></h2>
+      <h2 id="pf-title" style="margin:0"></h2>
       <button class="btn mini dark" id="btn-signout"></button>
     </div>
-    <div id="order-list"></div>
-    <div style="border-top:1px dashed var(--border);margin-top:18px;padding-top:16px">
-      <h2 id="pf-title"></h2>
+    <div style="margin-top:14px">
       <div class="prof-row"><span id="pf-name-l"></span><input id="pf-name"></div>
       <div class="prof-row"><span id="pf-lang-l"></span>
         <select id="pf-lang"><option value="en">English</option><option value="es">Español</option></select></div>
@@ -182,11 +196,21 @@
     </div>
   </div>
 
+  <!-- App-style bottom navigation (signed-in customers) -->
+  <nav class="pnav" id="pnav" hidden data-lulu-avoid>
+    <button id="pn-pieces" class="on"><span class="pn-ico">🧶</span><span id="pn-pieces-l"></span></button>
+    <button id="pn-profile"><span class="pn-ico">👤</span><span id="pn-profile-l"></span></button>
+    <a href="/" id="pn-shop"><span class="pn-ico">🏠</span><span id="pn-shop-l"></span></a>
+  </nav>
+
   <!-- Single order -->
   <div id="v-order" hidden>
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
-        <h1 id="o-item"></h1><span class="chip pink" id="o-code"></span>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <img id="o-photo" alt="" hidden>
+        <div style="flex:1;min-width:200px;display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+          <h1 id="o-item" style="margin:0"></h1><span class="chip pink" id="o-code"></span>
+        </div>
       </div>
       <div class="steps" id="o-steps"></div>
       <div class="meta"><span id="m-total-label"></span><b id="m-total"></b></div>
@@ -258,7 +282,7 @@
   </div>
 </div>
 
-<script src="/js/config.js?v=20260731h"></script>
+<script src="/js/config.js?v=20260731i"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
@@ -311,7 +335,8 @@
     pfZip: 'ZIP / postal code', pfCountry: 'Country',
     pfShipNote: 'Used to quote your real shipping — saving updates any of your orders that haven\u2019t shipped yet.',
     pfShipIncomplete: 'To save a shipping address, fill at least street, city and ZIP — or clear all fields to remove it.',
-    pfShipCleared: 'Shipping address removed ✓'
+    pfShipCleared: 'Shipping address removed ✓',
+    pnPieces: 'My pieces', pnProfile: 'My profile', pnShop: 'Shop'
   }, es: {
     stages: ['Nueva solicitud', 'Revisión de cotización', 'En proceso', 'Lista', 'Enviada'],
     aTitle: 'Mis pedidos', aSub: 'Inicia sesión para ver tus piezas, escribirle al estudio y aprobar tu pieza terminada. El enlace de tu correo también funciona — sin cuenta.',
@@ -346,7 +371,8 @@
     pfZip: 'Código postal', pfCountry: 'País',
     pfShipNote: 'Se usa para cotizar tu envío real — al guardar se actualizan tus pedidos que aún no se envían.',
     pfShipIncomplete: 'Para guardar la dirección llena al menos calle, ciudad y código postal — o deja todo vacío para quitarla.',
-    pfShipCleared: 'Dirección de envío eliminada ✓'
+    pfShipCleared: 'Dirección de envío eliminada ✓',
+    pnPieces: 'Mis piezas', pnProfile: 'Mi perfil', pnShop: 'Tienda'
   } };
   function t() { return STR[lang]; }
   function $(id) { return document.getElementById(id); }
@@ -419,6 +445,9 @@
     $('pf-state-l').textContent = t().pfState;
     $('pf-zip-l').textContent = t().pfZip;
     $('pf-country-l').textContent = t().pfCountry;
+    $('pn-pieces-l').textContent = t().pnPieces;
+    $('pn-profile-l').textContent = t().pnProfile;
+    $('pn-shop-l').textContent = t().pnShop;
     fillCountries();
     $('list-title').textContent = t().listTitle;
     $('btn-signout').textContent = t().signout;
@@ -443,13 +472,24 @@
 
   /* ---------- views ---------- */
   function show(view) {
-    ['v-access', 'v-reset', 'v-list', 'v-order'].forEach(function (v) { $(v).hidden = v !== view; });
+    ['v-access', 'v-reset', 'v-list', 'v-profile', 'v-order'].forEach(function (v) { $(v).hidden = v !== view; });
+    // app-style bottom nav: only for signed-in customers
+    var nav = $('pnav');
+    var signedIn = !!state.jwt;
+    nav.hidden = !signedIn || view === 'v-access' || view === 'v-reset';
+    document.body.classList.toggle('has-pnav', !nav.hidden);
+    $('pn-pieces').classList.toggle('on', view === 'v-list' || view === 'v-order');
+    $('pn-profile').classList.toggle('on', view === 'v-profile');
   }
 
   function renderOrder() {
     var o = state.order;
     $('o-item').textContent = o.item;
     $('o-code').textContent = o.code;
+    var op = $('o-photo');
+    var photo = o.img_url || o.img || '';
+    op.hidden = !photo;
+    if (photo) op.src = photo;
     $('o-steps').innerHTML = t().stages.map(function (name, i) {
       var cls = i < o.stage ? ' done' : i === o.stage ? ' now' : '';
       return '<div class="stepc' + cls + '">' + esc(name) + '</div>';
@@ -682,6 +722,11 @@
     show('v-access');
   });
   $('back-list').addEventListener('click', function (e) { e.preventDefault(); renderList(); });
+  $('pn-pieces').addEventListener('click', function () {
+    if (state.orders.length === 1 && state.order) { show('v-order'); return; }
+    renderList();
+  });
+  $('pn-profile').addEventListener('click', function () { show('v-profile'); loadProfile(); });
 
   $('c-file').addEventListener('change', function () {
     $('c-file-name').textContent = $('c-file').files[0] ? $('c-file').files[0].name : '';
@@ -903,6 +948,6 @@
   } else show('v-access');
 })();
 </script>
-<script src="/js/lulu-chat.js?v=20260731h" defer></script>
+<script src="/js/lulu-chat.js?v=20260731i" defer></script>
 </body>
 </html>
