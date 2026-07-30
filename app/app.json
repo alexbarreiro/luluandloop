@@ -21,13 +21,18 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "backgroundColor": "#FFF8F0",
+          "resizeMode": "contain",
+          "imageWidth": 220
+        }
+      ]
     ],
-    "scheme": "luluandloop",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FFF8F0"
-    }
+    "scheme": "luluandloop"
   }
 }
