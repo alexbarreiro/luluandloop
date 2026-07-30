@@ -29,7 +29,10 @@
     '#lulu-chat-panel{position:fixed;right:18px;bottom:18px;z-index:195;width:min(390px,calc(100vw - 24px));' +
     'height:min(620px,calc(100vh - 40px));background:#FFF8F0;border:1px solid #F0E2D8;border-radius:20px;' +
     'box-shadow:0 24px 60px -12px rgba(42,42,51,.4);display:flex;flex-direction:column;overflow:hidden;font-family:inherit;}' +
-    '@media (max-width:560px){#lulu-chat-panel{right:0;bottom:0;width:100vw;height:100dvh;border-radius:0;}}' +
+    '@media (max-width:560px){#lulu-chat-panel{right:0;bottom:auto;top:0;left:0;width:100vw;height:100dvh;border-radius:0;}}' +
+    '.lc-msgs{overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}' +
+    '#lulu-chat-launch{bottom:calc(18px + env(safe-area-inset-bottom));}' +
+    '.lc-compose{padding-bottom:calc(10px + env(safe-area-inset-bottom));}' +
     '.lc-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #F0E2D8;background:#FFF8F0;}' +
     '.lc-head img{width:40px;height:40px;border-radius:50%;border:2px solid #E4657E;}' +
     '.lc-name{font-weight:900;color:#2A2A33;font-size:16px;line-height:1.1;}' +
@@ -200,8 +203,56 @@
     });
   }
 
+  var isMobile = window.matchMedia('(max-width: 560px)').matches || 'ontouchstart' in window;
+  var savedScrollY = 0;
+  function lockBody() {
+    if (!window.matchMedia('(max-width: 560px)').matches) return;
+    savedScrollY = window.scrollY || 0;
+    document.body.style.position = 'fixed';
+    document.body.style.top = (-savedScrollY) + 'px';
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+  }
+  function unlockBody() {
+    if (!document.body.style.position) return;
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window.scrollTo(0, savedScrollY);
+  }
+  // Pin the panel to the VISUAL viewport so the iOS/Android keyboard shrinks
+  // the chat instead of shoving the header and messages off-screen
+  function fitPanel() {
+    if (!panel || panel.style.display === 'none') return;
+    if (!window.matchMedia('(max-width: 560px)').matches) {
+      panel.style.height = ''; panel.style.top = ''; panel.style.transform = '';
+      return;
+    }
+    var vv = window.visualViewport;
+    if (vv) {
+      panel.style.height = Math.round(vv.height) + 'px';
+      panel.style.transform = 'translateY(' + Math.round(vv.offsetTop) + 'px)';
+    } else {
+      panel.style.height = window.innerHeight + 'px';
+    }
+    if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
+  }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', fitPanel);
+    window.visualViewport.addEventListener('scroll', fitPanel);
+  }
+  window.addEventListener('resize', fitPanel);
+
   function openPanel() {
-    if (panel) { panel.style.display = 'flex'; launch.style.display = 'none'; render(); inputEl.focus(); return; }
+    if (panel) {
+      panel.style.display = 'flex'; launch.style.display = 'none';
+      lockBody(); fitPanel(); render();
+      if (!isMobile) inputEl.focus();
+      return;
+    }
     panel = document.createElement('div');
     panel.id = 'lulu-chat-panel';
     panel.innerHTML =
@@ -222,14 +273,23 @@
     panel.querySelector('.lc-close').addEventListener('click', function () {
       panel.style.display = 'none';
       launch.style.display = 'flex';
+      unlockBody();
     });
+    // when the keyboard opens on focus, re-fit and keep the thread pinned
+    inputEl.addEventListener('focus', function () {
+      setTimeout(fitPanel, 60);
+      setTimeout(fitPanel, 350);
+    });
+    inputEl.addEventListener('blur', function () { setTimeout(fitPanel, 60); });
     sendEl.addEventListener('click', send);
     inputEl.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
     launch.style.display = 'none';
+    lockBody();
+    fitPanel();
     render();
-    inputEl.focus();
+    if (!isMobile) inputEl.focus();
   }
 
   launch.addEventListener('click', openPanel);
