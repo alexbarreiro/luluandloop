@@ -219,7 +219,7 @@
   </div>
 </div>
 
-<script src="/js/config.js?v=20260729a"></script>
+<script src="/js/config.js?v=20260729b"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
@@ -235,6 +235,7 @@
   var state = { order: null, messages: [], orders: [], jwt: null, email: null, mode: 'signin', review: null, rvRating: 0, prefs: null };
   if (sb) sb.auth.onAuthStateChange(function (_event, session) {
     state.jwt = session ? session.access_token : state.jwt;
+    window.LULU_CHAT_JWT = state.jwt;
   });
 
   var STR = { en: {
@@ -724,5 +725,6 @@
   } else show('v-access');
 })();
 </script>
+<script src="/js/lulu-chat.js?v=20260729b" defer></script>
 </body>
 </html>

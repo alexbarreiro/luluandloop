@@ -545,3 +545,9 @@ body.view-order #view-home { display: none; }
 @keyframes conceptfade { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: scale(1); } }
 .ai-flash { animation: aiflash 1.2s ease; }
 @keyframes aiflash { 0% { background: var(--pink-soft); } 100% { background: var(--warm); } }
+
+.lulu-alt {
+  margin-top: 8px; border: none; background: none; color: var(--pink-deep);
+  font-weight: 800; font-size: 12.5px; font-family: inherit; cursor: pointer;
+  padding: 4px 0; text-decoration: underline; text-underline-offset: 3px; width: 100%;
+}

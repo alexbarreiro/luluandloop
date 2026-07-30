@@ -69,6 +69,10 @@ YOUR JOB IN THIS APP:
    complaints, custom timelines — call contact_studio so the human team follows up, and
    say you've passed it along.
 
+CONTEXT: On the website there is also a step-by-step Design wizard — if the customer
+prefers filling forms, you can mention it ("el asistente de diseño arriba") — but most
+people who open this chat want YOU to guide them; do that with joy.
+
 RULES: Never invent prices, discounts, or dates beyond the table above. Never promise a
 delivery date — give the size's week range. Don't take payment details in chat — payment
 happens only through the checkout button. If asked about anything outside Lulu & Loop,
@@ -129,7 +133,7 @@ const TOOLS: Anthropic.Tool[] = [
 
 type Action = Record<string, unknown>;
 
-async function runTool(name: string, input: Record<string, unknown>, jwtEmail: string | null, actions: Action[]): Promise<string> {
+async function runTool(name: string, input: Record<string, unknown>, jwtEmail: string | null, actions: Action[], embedded: boolean): Promise<string> {
   if (name === "preview_design") {
     const r1 = await fetch(`${FN_BASE}/design-agent`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -154,10 +158,11 @@ async function runTool(name: string, input: Record<string, unknown>, jwtEmail: s
         name: input.name, email: input.email, cat_id: input.cat_id, size_idx: input.size_idx,
         rush: input.rush, desc: input.desc, colors: input.colors, lang: input.lang,
         concept_path: input.concept_path || undefined,
+        embedded,
       }),
     }).then((r) => r.json());
-    if (r?.url && r?.code) {
-      actions.push({ type: "checkout", url: r.url, code: r.code });
+    if ((r?.url || r?.client_secret) && r?.code) {
+      actions.push({ type: "checkout", url: r.url ?? null, client_secret: r.client_secret ?? null, code: r.code });
       return JSON.stringify({ ok: true, order_code: r.code,
         note: "Payment button is now visible in the app. Tell them to tap it to pay the 40% deposit." });
     }
@@ -201,7 +206,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   if (!ANTHROPIC_KEY) return json({ error: "Lulu AI not configured yet" }, 501);
 
-  let body: { messages?: Array<{ role: string; content: unknown }>; jwt?: string };
+  let body: { messages?: Array<{ role: string; content: unknown }>; jwt?: string; embedded?: boolean };
   try { body = await req.json(); } catch { return json({ error: "invalid JSON" }, 400); }
   const history = Array.isArray(body.messages) ? body.messages.slice(-30) : [];
   if (!history.length) return json({ error: "messages required" }, 400);
@@ -245,7 +250,7 @@ Deno.serve(async (req) => {
     for (const tu of toolUses) {
       let out: string;
       try {
-        out = await runTool(tu.name, tu.input as Record<string, unknown>, jwtEmail, actions);
+        out = await runTool(tu.name, tu.input as Record<string, unknown>, jwtEmail, actions, body.embedded === true);
       } catch (e) {
         out = `tool error: ${String(e).slice(0, 200)}`;
       }

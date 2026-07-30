@@ -81,6 +81,7 @@
     fCat: 'What are we making?', fSize: 'Pick a size', fDesc: 'Describe your idea',
     fDescPh: '“My daughter’s cat as a little witch, with a purple nose and a tiny broom…”',
     fDescHint: 'A photo, a sketch or three sentences — anything works. You can send reference photos after checkout too.',
+    talkLulu: '💬 Prefer to chat? Talk it through with Lulu',
     conceptBtn: '✨ Preview my piece with AI', conceptWorking: '✨ Sketching your idea…',
     conceptNote: 'An AI sketch of your idea — Lulu crochets the real one, stitch by stitch. 💗',
     conceptErr: 'The sketch didn’t work this time — your words are all Lulu needs anyway.',
@@ -157,6 +158,7 @@
     fCat: '¿Qué vamos a hacer?', fSize: 'Elige el tamaño', fDesc: 'Describe tu idea',
     fDescPh: '“El gato de mi hija como brujita, con nariz morada y su escobita…”',
     fDescHint: 'Una foto, un boceto o tres frases — lo que sea sirve. También puedes mandar referencias después del pago.',
+    talkLulu: '💬 ¿Prefieres platicarlo? Cuéntaselo a Lulu',
     conceptBtn: '✨ Ver mi pieza con IA', conceptWorking: '✨ Dibujando tu idea…',
     conceptNote: 'Un boceto de tu idea hecho con IA — Lulu teje la de verdad, puntada a puntada. 💗',
     conceptErr: 'El boceto no salió esta vez — con tus palabras le basta a Lulu.',
@@ -680,6 +682,8 @@
     var conceptBtn = $('btn-concept');
     if (conceptBtn && window.LULU_CONFIG && window.LULU_CONFIG.SUPABASE_URL) {
       conceptBtn.hidden = false;
+      var altBtn = $('btn-lulu-chat-alt');
+      if (altBtn) altBtn.hidden = false;
       var aiStatusTimer = null, aiTypeTimer = null;
       function aiCall(payload) {
         return fetch(window.LULU_CONFIG.SUPABASE_URL + '/functions/v1/design-agent', {

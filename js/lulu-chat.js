@@ -1,0 +1,237 @@
+/* Lulu & Loop — "Habla con Lulu" website chat widget.
+   Self-contained (injects its own styles + DOM): floating launcher with
+   Lulu's photo → chat panel powered by the same lulu-agent as the mobile
+   apps. Concept sketches render inline; checkout opens the embedded Stripe
+   modal without leaving the site. On the portal page, set
+   window.LULU_CHAT_JWT to the session token to enable "my orders". */
+(function () {
+  'use strict';
+  var cfg = window.LULU_CONFIG || {};
+  if (!cfg.SUPABASE_URL) return; // demo mode: no agent backend
+
+  var ES = (document.documentElement.lang || 'en').indexOf('es') === 0 ||
+           (localStorage.getItem('luluandloop.lang') === 'es');
+  function T(en, es) { return ES ? es : en; }
+
+  var HELLO = {
+    role: 'lulu',
+    text: T("Hi! I'm Lulu 💗 Tell me what you'd love me to crochet — or ask me anything about your order.",
+            '¡Hola! Soy Lulu 💗 Cuéntame qué te gustaría que tejiera — o pregúntame lo que sea de tu pedido.')
+  };
+
+  /* ---------- styles ---------- */
+  var css = '' +
+    '#lulu-chat-launch{position:fixed;right:18px;bottom:18px;z-index:190;display:flex;align-items:center;gap:10px;' +
+    'background:#2A2A33;color:#FFF4F2;border:none;border-radius:999px;padding:8px 18px 8px 8px;cursor:pointer;' +
+    'box-shadow:0 12px 30px -8px rgba(42,42,51,.45);font-family:inherit;font-weight:800;font-size:14px;}' +
+    '#lulu-chat-launch:hover{background:#E4657E;}' +
+    '#lulu-chat-launch img{width:38px;height:38px;border-radius:50%;border:2px solid #E4657E;display:block;}' +
+    '#lulu-chat-panel{position:fixed;right:18px;bottom:18px;z-index:195;width:min(390px,calc(100vw - 24px));' +
+    'height:min(620px,calc(100vh - 40px));background:#FFF8F0;border:1px solid #F0E2D8;border-radius:20px;' +
+    'box-shadow:0 24px 60px -12px rgba(42,42,51,.4);display:flex;flex-direction:column;overflow:hidden;font-family:inherit;}' +
+    '@media (max-width:560px){#lulu-chat-panel{right:0;bottom:0;width:100vw;height:100dvh;border-radius:0;}}' +
+    '.lc-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #F0E2D8;background:#FFF8F0;}' +
+    '.lc-head img{width:40px;height:40px;border-radius:50%;border:2px solid #E4657E;}' +
+    '.lc-name{font-weight:900;color:#2A2A33;font-size:16px;line-height:1.1;}' +
+    '.lc-name b{color:#E4657E;}' +
+    '.lc-sub{font-size:11px;color:#6E6E7A;font-weight:700;}' +
+    '.lc-close{margin-left:auto;border:1px solid #F0E2D8;background:#FFFEFC;border-radius:50%;width:30px;height:30px;' +
+    'cursor:pointer;color:#6E6E7A;font-size:13px;line-height:1;}' +
+    '.lc-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;}' +
+    '.lc-row{display:flex;gap:8px;align-items:flex-end;}' +
+    '.lc-row img{width:26px;height:26px;border-radius:50%;flex-shrink:0;}' +
+    '.lc-b{border-radius:14px;padding:10px 13px;font-size:14px;line-height:1.5;max-width:82%;}' +
+    '.lc-lulu{background:#FFFEFC;border:1px solid #F0E2D8;color:#2A2A33;border-bottom-left-radius:4px;}' +
+    '.lc-me{background:#E4657E;color:#FFF4F2;align-self:flex-end;border-bottom-right-radius:4px;}' +
+    '.lc-concept{background:#FFFEFC;border:1px solid #F0E2D8;border-radius:14px;padding:8px;max-width:82%;margin-left:34px;}' +
+    '.lc-concept img{width:100%;border-radius:10px;display:block;}' +
+    '.lc-concept p{font-size:10.5px;color:#B6B1BC;font-weight:700;text-align:center;margin:6px 0 0;}' +
+    '.lc-pay{margin-left:34px;background:#2A2A33;color:#FFF8F0;border:none;border-radius:999px;padding:12px 20px;' +
+    'font-weight:800;font-size:13.5px;cursor:pointer;font-family:inherit;align-self:flex-start;}' +
+    '.lc-pay:hover{background:#E4657E;}' +
+    '.lc-order{margin-left:34px;background:#FFFEFC;border:1px solid #F0E2D8;border-radius:12px;padding:9px 12px;max-width:82%;}' +
+    '.lc-order b{font-size:13px;color:#2A2A33;display:block;}' +
+    '.lc-order span{font-size:11.5px;color:#6E6E7A;}' +
+    '.lc-typing{font-size:11.5px;color:#B6B1BC;font-weight:700;font-style:italic;margin-left:34px;}' +
+    '.lc-compose{display:flex;gap:8px;padding:10px;border-top:1px solid #F0E2D8;background:#FFF8F0;align-items:flex-end;}' +
+    '.lc-compose textarea{flex:1;background:#FFFEFC;border:1px solid #F0E2D8;border-radius:16px;padding:10px 13px;' +
+    'font-size:16px;color:#2A2A33;font-family:inherit;resize:none;max-height:96px;min-height:40px;}' +
+    '.lc-send{background:#E4657E;border:none;border-radius:50%;width:40px;height:40px;color:#fff;font-size:16px;' +
+    'cursor:pointer;font-weight:800;flex-shrink:0;}' +
+    '.lc-send:disabled{opacity:.5;}' +
+    '#lulu-chat-stripe{position:fixed;inset:0;z-index:220;background:rgba(42,42,51,.55);display:flex;' +
+    'align-items:center;justify-content:center;padding:18px;}' +
+    '#lulu-chat-stripe .box{position:relative;background:#fff;border-radius:18px;width:min(480px,100%);' +
+    'max-height:92vh;overflow-y:auto;padding:14px;box-sizing:border-box;}' +
+    '#lulu-chat-stripe .x{position:absolute;top:10px;right:10px;z-index:2;border:1px solid #F0E2D8;background:#FFFEFC;' +
+    'border-radius:50%;width:32px;height:32px;cursor:pointer;color:#6E6E7A;}' +
+    '@media (max-width:560px){#lulu-chat-stripe{padding:0;align-items:stretch;}#lulu-chat-stripe .box{width:100%;max-height:100vh;border-radius:0;}}';
+  var style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+
+  /* ---------- DOM ---------- */
+  var AV = '/assets/lulu-avatar.jpg';
+  var launch = document.createElement('button');
+  launch.id = 'lulu-chat-launch';
+  launch.innerHTML = '<img src="' + AV + '" alt=""><span>' + T('Talk with Lulu', 'Habla con Lulu') + '</span>';
+  document.body.appendChild(launch);
+
+  var panel = null, msgsEl = null, inputEl = null, sendEl = null, typingEl = null;
+  var messages = [];
+  try { messages = JSON.parse(localStorage.getItem('lulu.webchat') || 'null') || [HELLO]; }
+  catch (e) { messages = [HELLO]; }
+  var busy = false;
+
+  function save() {
+    try { localStorage.setItem('lulu.webchat', JSON.stringify(messages.slice(-40))); } catch (e) { /* ignore */ }
+  }
+
+  function esc(sx) {
+    return String(sx == null ? '' : sx).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function render() {
+    if (!msgsEl) return;
+    var html = '';
+    messages.forEach(function (m) {
+      if (m.role === 'me') {
+        html += '<div class="lc-b lc-me">' + esc(m.text) + '</div>';
+      } else {
+        html += '<div class="lc-row"><img src="' + AV + '" alt=""><div class="lc-b lc-lulu">' + esc(m.text) + '</div></div>';
+        if (m.concept) {
+          html += '<div class="lc-concept"><img src="' + esc(m.concept) + '" alt="AI concept"><p>' +
+            T('AI sketch — Lulu crochets the real one 💗', 'Boceto IA — Lulu teje la de verdad 💗') + '</p></div>';
+        }
+        if (m.checkout) {
+          html += '<button class="lc-pay" data-code="' + esc(m.checkout.code) + '">💳 ' +
+            T('Pay deposit', 'Pagar depósito') + ' · ' + esc(m.checkout.code) + '</button>';
+        }
+        if (m.orders) {
+          m.orders.forEach(function (o) {
+            html += '<div class="lc-order"><b>' + esc(o.item) + '</b><span>' + esc(o.code) + ' · ' + esc(o.stage) +
+              (o.tracking ? ' · 📦' : '') + '</span></div>';
+          });
+        }
+      }
+    });
+    msgsEl.innerHTML = html;
+    typingEl.style.display = busy ? 'block' : 'none';
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+    Array.prototype.forEach.call(msgsEl.querySelectorAll('.lc-pay'), function (b) {
+      b.addEventListener('click', function () {
+        var m = messages.filter(function (x) { return x.checkout && x.checkout.code === b.getAttribute('data-code'); })[0];
+        if (m) openPayment(m.checkout);
+      });
+    });
+  }
+
+  /* ---------- embedded Stripe from chat ---------- */
+  var stripeLoading = null, stripeCheckout = null;
+  function loadStripe() {
+    if (window.Stripe) return Promise.resolve();
+    if (stripeLoading) return stripeLoading;
+    stripeLoading = new Promise(function (res, rej) {
+      var sc = document.createElement('script');
+      sc.src = 'https://js.stripe.com/v3/';
+      sc.onload = res; sc.onerror = rej;
+      document.head.appendChild(sc);
+    });
+    return stripeLoading;
+  }
+  function openPayment(co) {
+    if (co.client_secret && cfg.STRIPE_PK) {
+      loadStripe().then(function () {
+        var wrap = document.getElementById('lulu-chat-stripe');
+        if (!wrap) {
+          wrap = document.createElement('div');
+          wrap.id = 'lulu-chat-stripe';
+          wrap.innerHTML = '<div class="box"><button class="x">✕</button><div class="mount"></div></div>';
+          document.body.appendChild(wrap);
+          wrap.querySelector('.x').addEventListener('click', function () {
+            if (stripeCheckout) { try { stripeCheckout.destroy(); } catch (e) { /* ignore */ } stripeCheckout = null; }
+            wrap.remove();
+          });
+        }
+        var stripe = window.Stripe(cfg.STRIPE_PK);
+        return stripe.initEmbeddedCheckout({ clientSecret: co.client_secret }).then(function (checkout) {
+          stripeCheckout = checkout;
+          checkout.mount(wrap.querySelector('.mount'));
+        });
+      }).catch(function () { if (co.url) window.open(co.url, '_blank'); });
+    } else if (co.url) {
+      window.open(co.url, '_blank');
+    }
+  }
+
+  /* ---------- agent call ---------- */
+  function send() {
+    var text = inputEl.value.trim();
+    if (!text || busy) return;
+    inputEl.value = '';
+    messages.push({ role: 'me', text: text });
+    busy = true; save(); render();
+    var history = messages.filter(function (m) { return m.role === 'me' || m.role === 'lulu'; })
+      .slice(-16)
+      .map(function (m) { return { role: m.role === 'me' ? 'user' : 'assistant', content: m.text }; });
+    fetch(cfg.SUPABASE_URL + '/functions/v1/lulu-agent', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: history,
+        jwt: window.LULU_CHAT_JWT || undefined,
+        embedded: !!cfg.STRIPE_PK
+      })
+    }).then(function (r) { return r.json(); }).then(function (res) {
+      busy = false;
+      var m = { role: 'lulu', text: (res && res.reply) || '…' };
+      (res && res.actions || []).forEach(function (a) {
+        if (a.type === 'concept') m.concept = a.url;
+        if (a.type === 'checkout') m.checkout = a;
+        if (a.type === 'orders') m.orders = a.orders;
+      });
+      messages.push(m);
+      save(); render();
+    }).catch(function () {
+      busy = false;
+      messages.push({ role: 'lulu', text: T('My yarn got tangled 🧶 — say that once more?', 'Se me enredó el estambre 🧶 ¿me lo repites?') });
+      save(); render();
+    });
+  }
+
+  function openPanel() {
+    if (panel) { panel.style.display = 'flex'; launch.style.display = 'none'; render(); inputEl.focus(); return; }
+    panel = document.createElement('div');
+    panel.id = 'lulu-chat-panel';
+    panel.innerHTML =
+      '<div class="lc-head"><img src="' + AV + '" alt="Lulu">' +
+      '<div><div class="lc-name">Lulu <b>&amp;</b> Loop</div>' +
+      '<div class="lc-sub">' + T('Lulu · always online 🧶', 'Lulu · siempre en línea 🧶') + '</div></div>' +
+      '<button class="lc-close" aria-label="Close">✕</button></div>' +
+      '<div class="lc-msgs"></div>' +
+      '<div class="lc-typing" style="display:none;padding:0 14px 6px">' + T('Lulu is typing…', 'Lulu está escribiendo…') + '</div>' +
+      '<div class="lc-compose"><textarea rows="1" placeholder="' +
+      T('Tell Lulu your idea…', 'Cuéntale tu idea a Lulu…') + '"></textarea>' +
+      '<button class="lc-send" aria-label="Send">➤</button></div>';
+    document.body.appendChild(panel);
+    msgsEl = panel.querySelector('.lc-msgs');
+    typingEl = panel.querySelector('.lc-typing');
+    inputEl = panel.querySelector('textarea');
+    sendEl = panel.querySelector('.lc-send');
+    panel.querySelector('.lc-close').addEventListener('click', function () {
+      panel.style.display = 'none';
+      launch.style.display = 'flex';
+    });
+    sendEl.addEventListener('click', send);
+    inputEl.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+    launch.style.display = 'none';
+    render();
+    inputEl.focus();
+  }
+
+  launch.addEventListener('click', openPanel);
+  window.addEventListener('lulu-chat-open', openPanel);
+})();
