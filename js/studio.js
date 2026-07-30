@@ -1467,15 +1467,20 @@
     // AI concept image from the customer's dictated idea
     var oldConcept = document.getElementById('drawer-concept');
     if (oldConcept) oldConcept.remove();
-    if (o.concept_path) {
+    // The main order picture already shows the AI concept until the customer
+    // approves the finished piece — after approval the final photo takes over
+    // the main slot and this box keeps the original concept for reference.
+    if (o.concept_path && o.photo_path) {
       var conceptBox = document.createElement('div');
       conceptBox.id = 'drawer-concept';
       conceptBox.innerHTML = '<div class="drawer-section-title" style="margin-top:10px">✨ AI concept (customer\u2019s idea)</div>' +
         '<img class="photo" style="max-height:220px" alt="AI concept">';
       $('drawer-desc').insertAdjacentElement('afterend', conceptBox);
-      S.evidenceUrl(o.concept_path).then(function (url) {
+      // evidenceUrl expects { evidence_path } — a bare string silently yields ''
+      S.evidenceUrl({ evidence_path: o.concept_path }).then(function (url) {
         var img = conceptBox.querySelector('img');
         if (img && url) img.src = url;
+        else conceptBox.remove(); // never leave an empty frame
       }).catch(function () { conceptBox.remove(); });
     }
     $('drawer-chips').innerHTML =
