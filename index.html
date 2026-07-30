@@ -183,8 +183,13 @@
                 <span data-i18n="conceptBtn">✨ Preview my piece with AI</span>
               </button>
               <div class="concept-card" id="concept-card" hidden>
-                <img id="concept-img" alt="AI concept of your piece">
-                <p class="concept-note" data-i18n="conceptNote">An AI sketch of your idea — Lulu crochets the real one, stitch by stitch. 💗</p>
+                <div class="concept-working" id="concept-working" hidden>
+                  <div class="concept-skeleton"><span class="yarn">🧶</span></div>
+                  <div class="concept-status" id="concept-status"></div>
+                  <div class="concept-progress"><i id="concept-bar"></i></div>
+                </div>
+                <img id="concept-img" alt="AI concept of your piece" hidden>
+                <p class="concept-note" id="concept-note" data-i18n="conceptNote" hidden>An AI sketch of your idea — Lulu crochets the real one, stitch by stitch. 💗</p>
               </div>
               <div class="field-hint" data-i18n="fDescHint">A photo, a sketch or three sentences — anything works. You can send reference photos after checkout too.</div>
             </div>

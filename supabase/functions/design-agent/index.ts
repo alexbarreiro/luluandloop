@@ -54,8 +54,19 @@ Deno.serve(async (req) => {
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: "invalid JSON" }, 400); }
+  const stage = String(body.stage ?? "full"); // 'design' (fast) | 'image' | 'full' (legacy)
   const transcript = String(body.transcript ?? "").trim().slice(0, 1500);
   const lang = body.lang === "es" ? "es" : "en";
+
+  // Stage 2: render the concept image only (the client already has the design)
+  if (stage === "image") {
+    const imagePrompt = String(body.image_prompt ?? "").trim().slice(0, 1200);
+    if (imagePrompt.length < 8) return json({ error: "image_prompt required" }, 400);
+    if (!OPENAI_KEY) return json({ concept_path: null, concept_url: null });
+    const rendered = await renderConcept(imagePrompt);
+    return json(rendered);
+  }
+
   if (transcript.length < 8) return json({ error: "tell us a little more about your idea" }, 400);
 
   const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY });
@@ -101,37 +112,43 @@ the crocheted version.`,
   try { design = JSON.parse(text.text); } catch { return json({ error: "design parse failed — try again" }, 500); }
   design.size_idx = Math.min(Math.max(0, design.size_idx | 0), (SIZES[design.cat_id] ?? 3) - 1);
 
-  // Render the concept (optional — needs OPENAI_API_KEY)
+  // Stage 1 ('design'): return the structured design immediately — the client
+  // shows it while requesting the image in a second call. 'full' keeps the
+  // legacy single-call behavior.
+  if (stage === "design") return json({ design });
+
+  const rendered = OPENAI_KEY ? await renderConcept(design.image_prompt) : { concept_path: null, concept_url: null };
+  return json({ design, ...rendered });
+});
+
+async function renderConcept(imagePrompt: string) {
   let conceptPath: string | null = null;
   let conceptUrl: string | null = null;
-  if (OPENAI_KEY) {
-    try {
-      const img = await fetch("https://api.openai.com/v1/images/generations", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "gpt-image-1",
-          prompt: `Product concept photo of a handmade crochet piece: ${design.image_prompt}. ` +
-            "Amigurumi crochet style, visible yarn stitches, warm cream studio background, soft natural light, no text.",
-          size: "1024x1024", quality: "medium", n: 1,
-        }),
-      });
-      const imgData = await img.json();
-      const b64 = imgData?.data?.[0]?.b64_json;
-      if (b64) {
-        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-        conceptPath = `concepts/${crypto.randomUUID()}.png`;
-        const { error: upErr } = await admin.storage.from("evidence")
-          .upload(conceptPath, bytes, { contentType: "image/png" });
-        if (upErr) conceptPath = null;
-        else {
-          const { data: signed } = await admin.storage.from("evidence")
-            .createSignedUrl(conceptPath, 60 * 60 * 24 * 30);
-          conceptUrl = signed?.signedUrl ?? null;
-        }
+  try {
+    const img = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-image-1",
+        prompt: `Product concept photo of a handmade crochet piece: ${imagePrompt}. ` +
+          "Amigurumi crochet style, visible yarn stitches, warm cream studio background, soft natural light, no text.",
+        size: "1024x1024", quality: "medium", n: 1,
+      }),
+    });
+    const imgData = await img.json();
+    const b64 = imgData?.data?.[0]?.b64_json;
+    if (b64) {
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      conceptPath = `concepts/${crypto.randomUUID()}.png`;
+      const { error: upErr } = await admin.storage.from("evidence")
+        .upload(conceptPath, bytes, { contentType: "image/png" });
+      if (upErr) conceptPath = null;
+      else {
+        const { data: signed } = await admin.storage.from("evidence")
+          .createSignedUrl(conceptPath, 60 * 60 * 24 * 30);
+        conceptUrl = signed?.signedUrl ?? null;
       }
-    } catch { /* image is a bonus — the structured design still returns */ }
-  }
-
-  return json({ design, concept_path: conceptPath, concept_url: conceptUrl });
-});
+    }
+  } catch { /* image is a bonus — the structured design still stands */ }
+  return { concept_path: conceptPath, concept_url: conceptUrl };
+}

@@ -85,6 +85,8 @@
     conceptNote: 'An AI sketch of your idea — Lulu crochets the real one, stitch by stitch. 💗',
     conceptErr: 'The sketch didn’t work this time — your words are all Lulu needs anyway.',
     micHint: 'Listening… describe your piece',
+    aiSteps: ['Reading your idea…', 'Choosing the yarns…', 'Sketching the shape…', 'Stitching the details…', 'Final touches…'],
+    aiDesignReady: 'Design ready — sketching it now…',
     fColors: 'Colors', fColorsPh: 'dusty pink, cream, sage…', fRef: 'Reference', fRefPh: 'Drop a photo or sketch',
     optional: '(optional)', fName: 'Your name', fEmail: 'Email',
     fRush: '⚡ Rush my piece', fRushSub: '+30% · jumps the queue, −40% wait',
@@ -159,6 +161,8 @@
     conceptNote: 'Un boceto de tu idea hecho con IA — Lulu teje la de verdad, puntada a puntada. 💗',
     conceptErr: 'El boceto no salió esta vez — con tus palabras le basta a Lulu.',
     micHint: 'Escuchando… describe tu pieza',
+    aiSteps: ['Leyendo tu idea…', 'Eligiendo los estambres…', 'Dibujando la forma…', 'Tejiendo los detalles…', 'Últimos toques…'],
+    aiDesignReady: 'Diseño listo — dibujando el boceto…',
     fColors: 'Colores', fColorsPh: 'rosa viejo, crema, salvia…', fRef: 'Referencia', fRefPh: 'Sube una foto o boceto',
     optional: '(opcional)', fName: 'Tu nombre', fEmail: 'Correo',
     fRush: '⚡ Pieza urgente', fRushSub: '+30% · se adelanta en la fila, −40% de espera',
@@ -676,35 +680,100 @@
     var conceptBtn = $('btn-concept');
     if (conceptBtn && window.LULU_CONFIG && window.LULU_CONFIG.SUPABASE_URL) {
       conceptBtn.hidden = false;
+      var aiStatusTimer = null, aiTypeTimer = null;
+      function aiCall(payload) {
+        return fetch(window.LULU_CONFIG.SUPABASE_URL + '/functions/v1/design-agent', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(function (r) { return r.json(); });
+      }
+      function aiProgressStart() {
+        $('concept-card').hidden = false;
+        $('concept-working').hidden = false;
+        $('concept-img').hidden = true;
+        $('concept-note').hidden = true;
+        $('concept-bar').style.width = '6%';
+        var steps = t().aiSteps, i = 0;
+        $('concept-status').textContent = steps[0];
+        clearInterval(aiStatusTimer);
+        aiStatusTimer = setInterval(function () {
+          i = Math.min(i + 1, steps.length - 1);
+          $('concept-status').textContent = steps[i];
+          // ease toward 90% while we wait — the reveal completes it
+          var cur = parseFloat($('concept-bar').style.width) || 6;
+          $('concept-bar').style.width = Math.min(cur + 16, 90) + '%';
+        }, 2600);
+        $('concept-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      function aiProgressDone(ok) {
+        clearInterval(aiStatusTimer);
+        $('concept-bar').style.width = '100%';
+        setTimeout(function () {
+          $('concept-working').hidden = true;
+          if (!ok) $('concept-card').hidden = $('concept-img').hidden = true;
+        }, ok ? 350 : 900);
+        if (!ok) $('concept-status').textContent = t().conceptErr;
+      }
+      function typewrite(el, textValue, onDone) {
+        clearInterval(aiTypeTimer);
+        var i = 0;
+        el.value = '';
+        aiTypeTimer = setInterval(function () {
+          i = Math.min(i + 3, textValue.length);
+          el.value = textValue.slice(0, i);
+          if (i >= textValue.length) {
+            clearInterval(aiTypeTimer);
+            if (onDone) onDone();
+          }
+        }, 24);
+      }
       conceptBtn.addEventListener('click', function () {
         var idea = $('f-desc').value.trim();
         if (idea.length < 8) { $('f-desc').focus(); return; }
         conceptBtn.disabled = true;
         conceptBtn.querySelector('span').textContent = t().conceptWorking;
-        fetch(window.LULU_CONFIG.SUPABASE_URL + '/functions/v1/design-agent', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcript: idea, lang: state.lang })
-        }).then(function (r) { return r.json(); }).then(function (res) {
-          conceptBtn.disabled = false;
-          conceptBtn.querySelector('span').textContent = t().conceptBtn;
-          if (!res || res.error || !res.design) { siteToast(t().conceptErr); return; }
+        aiProgressStart();
+
+        // Phase 1 — fast: Claude structures the idea; the form fills in live
+        aiCall({ stage: 'design', transcript: idea, lang: state.lang }).then(function (res) {
+          if (!res || res.error || !res.design) throw new Error((res && res.error) || 'no design');
           var d = res.design;
-          // apply the agent's picks to the form
           if (CATS.some(function (c) { return c.id === d.cat_id; })) state.form.cat = d.cat_id;
           state.form.size = d.size_idx || 0;
-          $('f-desc').value = state.lang === 'es' ? d.desc_es : d.desc_en;
-          state.form.desc = $('f-desc').value;
-          if (d.colors) { state.form.colors = d.colors; var fc = $('f-colors'); if (fc) fc.value = d.colors; }
-          state.conceptPath = res.concept_path || null;
-          state.conceptUrl = res.concept_url || null;
-          if (res.concept_url) {
-            $('concept-img').src = res.concept_url;
-            $('concept-card').hidden = false;
+          if (d.colors) { state.form.colors = d.colors; var fc = $('f-colors'); if (fc) { fc.value = d.colors; fc.classList.add('ai-flash'); } }
+          $('concept-status').textContent = t().aiDesignReady;
+          var descText = state.lang === 'es' ? d.desc_es : d.desc_en;
+          $('f-desc').classList.add('ai-flash');
+          typewrite($('f-desc'), descText, function () {
+            state.form.desc = descText;
+            renderAll();
+          });
+          state.form.desc = descText;
+
+          // Phase 2 — the sketch renders while the shimmer shows progress
+          return aiCall({ stage: 'image', image_prompt: d.image_prompt, lang: state.lang });
+        }).then(function (img) {
+          conceptBtn.disabled = false;
+          conceptBtn.querySelector('span').textContent = t().conceptBtn;
+          state.conceptPath = (img && img.concept_path) || null;
+          state.conceptUrl = (img && img.concept_url) || null;
+          if (img && img.concept_url) {
+            var ci = $('concept-img');
+            ci.onload = function () {
+              ci.hidden = false;
+              ci.classList.add('reveal');
+              $('concept-note').hidden = false;
+              aiProgressDone(true);
+            };
+            ci.src = img.concept_url;
+          } else {
+            aiProgressDone(false);
           }
           renderAll();
         }).catch(function () {
           conceptBtn.disabled = false;
           conceptBtn.querySelector('span').textContent = t().conceptBtn;
+          aiProgressDone(false);
           siteToast(t().conceptErr);
         });
       });
