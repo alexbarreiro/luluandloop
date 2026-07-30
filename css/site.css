@@ -302,8 +302,11 @@ textarea { resize: vertical; }
 .checkout-line { font-size: 13.5px; color: var(--text-2); margin-bottom: 6px; }
 .checkout-line.last { margin-bottom: 22px; }
 .pay-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
-@media (max-width: 430px) { .pay-fields { grid-template-columns: 1fr; } }
-.pay-field { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 800; }
+@media (max-width: 560px) { .pay-fields { grid-template-columns: 1fr; } }
+/* min-width:0 lets the columns shrink below the placeholder's intrinsic width —
+   without it the grid overflows the viewport on 431–470px phones */
+.pay-field { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 800; min-width: 0; }
+.pay-field input { width: 100%; min-width: 0; box-sizing: border-box; }
 .pay-field input, .card-group input, .card-split input {
   font-family: inherit; font-size: 15px; padding: 12px 14px;
   border: 1px solid var(--border); background: var(--page); color: var(--ink);
