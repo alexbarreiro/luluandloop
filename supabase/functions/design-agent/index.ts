@@ -64,13 +64,19 @@ Deno.serve(async (req) => {
     if (imagePrompt.length < 8) return json({ error: "image_prompt required" }, 400);
     if (!OPENAI_KEY) return json({ concept_path: null, concept_url: null });
     let rendered = await renderConcept(imagePrompt);
-    // Trademarked characters get blocked by the image model's moderation —
-    // rewrite the prompt generically (same look, no names) and retry once
+    let debranded: string | null = null;
+    // Trademarked characters get blocked by the image model's moderation.
+    // Retry ladder: (1) strip identifying marks but KEEP the customer's
+    // colors; (2) only if still blocked, allow the palette to change too.
     if (!rendered.concept_path && rendered.blocked) {
-      const safe = await debrandPrompt(imagePrompt);
-      if (safe) rendered = await renderConcept(safe);
+      const safe = await debrandPrompt(imagePrompt, "details");
+      if (safe) { rendered = await renderConcept(safe); debranded = "details"; }
+      if (!rendered.concept_path && rendered.blocked) {
+        const safest = await debrandPrompt(imagePrompt, "colors");
+        if (safest) { rendered = await renderConcept(safest); debranded = "colors"; }
+      }
     }
-    return json(rendered);
+    return json({ ...rendered, debranded: rendered.concept_path ? debranded : null });
   }
 
   if (transcript.length < 8) return json({ error: "tell us a little more about your idea" }, 400);
@@ -106,12 +112,12 @@ the crocheted version.
 CRITICAL for image_prompt: never name trademarked characters, franchises, brands,
 logos or real people ("Mickey Mouse", "Pokémon", "Spider-Man", "Messi"…) — the
 image model blocks the prompt AND any output that looks like the protected
-character. So for famous characters, describe an ORIGINAL interpretation: keep
-the species, silhouette and joyful spirit, but change the signature outfit
-colors/details so the render is clearly an original design (famous mouse → "a
-cute original cartoon mouse with big round ears, teal overalls with a yellow
-patch and a red neckerchief"). desc_en/desc_es MAY keep the customer's own
-words; image_prompt must be brand-free and visually original.`,
+character. Describe an ORIGINAL interpretation instead, with one hard rule:
+COLORS THE CUSTOMER ASKED FOR ARE SACRED — never swap them. Make the design
+original by removing logos/emblems/insignia, simplifying or altering the
+costume pattern, and leaning into cute amigurumi proportions — NOT by changing
+the palette. desc_en/desc_es MAY keep the customer's own words; image_prompt
+must be brand-free.`,
     messages: [{ role: "user", content: `Customer language: ${lang}\nCustomer's idea (dictated): ${transcript}` }],
   });
 
@@ -134,34 +140,50 @@ words; image_prompt must be brand-free and visually original.`,
 
   let rendered = OPENAI_KEY ? await renderConcept(design.image_prompt) : { concept_path: null, concept_url: null };
   if (OPENAI_KEY && !rendered.concept_path && (rendered as { blocked?: boolean }).blocked) {
-    const safe = await debrandPrompt(design.image_prompt);
+    const safe = await debrandPrompt(design.image_prompt, "details");
     if (safe) rendered = await renderConcept(safe);
+    if (!rendered.concept_path && (rendered as { blocked?: boolean }).blocked) {
+      const safest = await debrandPrompt(design.image_prompt, "colors");
+      if (safest) rendered = await renderConcept(safest);
+    }
   }
   return json({ design, ...rendered });
 });
 
-// Rewrites an image prompt so it passes moderation. The image model blocks
-// both trademarked NAMES and any OUTPUT that resembles the protected character,
-// so the rewrite must produce a clearly-original design: same species,
-// silhouette and spirit, different signature outfit/colors/details.
-async function debrandPrompt(imagePrompt: string): Promise<string | null> {
+// Rewrites an image prompt so it passes moderation. Two escalating modes:
+// 'details' preserves the customer's colors and strips identifying marks
+// (logos, emblems, exact costume pattern); 'colors' additionally changes the
+// palette — last resort only, because customers hate surprise colors.
+async function debrandPrompt(imagePrompt: string, mode: "details" | "colors"): Promise<string | null> {
+  const keepColors = "THE COLOR PALETTE IS SACRED — keep every color exactly as written. Make the design " +
+    "original by removing logos/emblems/insignia, replacing any identity-defining costume feature (a full " +
+    "face mask with shaped eye patches becomes a cute open face with big friendly round embroidered eyes " +
+    "and a stitched smile; web/bat/lightning patterns become plain fabric), and cuter amigurumi proportions.";
+  const changeColors = "Change the signature outfit colors AND details so the rendered image cannot be " +
+    "mistaken for the protected character.";
+  const params = {
+    max_tokens: 500,
+    output_config: { effort: "low" as const },
+    system: "You rewrite image-generation prompts that were blocked for depicting trademarked characters. " +
+      "Rewrite the prompt as a clearly ORIGINAL character: keep the species/silhouette/size/joyful spirit " +
+      "and remove every character or franchise name. " + (mode === "details" ? keepColors : changeColors) +
+      " Keep everything else — crochet/amigurumi style, background, lighting, composition — exactly as " +
+      "written. Reply with ONLY the rewritten prompt.",
+    messages: [{ role: "user", content: imagePrompt }] as Anthropic.MessageParam[],
+  };
+  const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY, maxRetries: 5 });
+  let r: Anthropic.Message;
   try {
-    const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY, maxRetries: 5 });
-    const r = await anthropic.messages.create({
-      model: "claude-opus-5",
-      max_tokens: 500,
-      output_config: { effort: "low" },
-      system: "You rewrite image-generation prompts that were blocked for depicting trademarked characters. " +
-        "Rewrite the prompt as a clearly ORIGINAL character: keep the species, silhouette, size and joyful " +
-        "spirit, but remove every name and change the signature outfit colors and details so the rendered " +
-        "image cannot be mistaken for the protected character (e.g. a famous mouse's red shorts + yellow " +
-        "shoes become teal overalls + a red neckerchief). Keep everything else — crochet/amigurumi style, " +
-        "background, lighting, composition — exactly as written. Reply with ONLY the rewritten prompt.",
-      messages: [{ role: "user", content: imagePrompt }],
-    });
-    const t = r.content.find((b) => b.type === "text");
-    return t && t.type === "text" && t.text.trim().length > 12 ? t.text.trim() : null;
-  } catch { return null; }
+    r = await anthropic.messages.create({ model: "claude-opus-5", ...params });
+  } catch (e) {
+    const status = (e as { status?: number })?.status ?? 0;
+    if (status < 500 && !/overloaded|529/i.test(String((e as Error)?.message ?? e))) return null;
+    try {
+      r = await anthropic.messages.create({ model: "claude-sonnet-5", ...params });
+    } catch { return null; }
+  }
+  const t = r.content.find((b) => b.type === "text");
+  return t && t.type === "text" && t.text.trim().length > 12 ? t.text.trim() : null;
 }
 
 async function renderConcept(imagePrompt: string): Promise<{

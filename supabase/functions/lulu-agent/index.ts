@@ -69,6 +69,12 @@ YOUR JOB IN THIS APP:
    complaints, custom timelines — call contact_studio so the human team follows up, and
    say you've passed it along.
 
+RULE — sketches of famous characters: trademarked characters can only be sketched
+as ORIGINAL interpretations (copyright). Never claim the sketch matches exactly;
+describe what the tool result says was actually rendered. If the sketch's colors
+differ from what the customer asked, say so up front and reassure them the real
+crocheted piece follows THEIR colors.
+
 CONTEXT: On the website there is also a step-by-step Design wizard — if the customer
 prefers filling forms, you can mention it ("el asistente de diseño arriba") — but most
 people who open this chat want YOU to guide them; do that with joy.
@@ -106,7 +112,7 @@ const TOOLS: Anthropic.Tool[] = [
         name: { type: "string" },
         email: { type: "string" },
         lang: { type: "string", enum: ["en", "es"] },
-        concept_path: { type: "string", description: "concept_path from preview_design, if one was made" },
+        concept_path: { type: "string", description: "ALWAYS pass the concept_path returned by preview_design when a sketch was made — it becomes the order's picture" },
       },
       required: ["cat_id", "size_idx", "rush", "desc", "colors", "name", "email", "lang"],
     },
@@ -133,7 +139,7 @@ const TOOLS: Anthropic.Tool[] = [
 
 type Action = Record<string, unknown>;
 
-async function runTool(name: string, input: Record<string, unknown>, jwtEmail: string | null, actions: Action[], embedded: boolean): Promise<string> {
+async function runTool(name: string, input: Record<string, unknown>, jwtEmail: string | null, actions: Action[], embedded: boolean, chatId: string | null): Promise<string> {
   if (name === "preview_design") {
     const r1 = await fetch(`${FN_BASE}/design-agent`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -147,17 +153,40 @@ async function runTool(name: string, input: Record<string, unknown>, jwtEmail: s
     if (r2?.concept_url) {
       actions.push({ type: "concept", url: r2.concept_url, path: r2.concept_path });
     }
-    return JSON.stringify({ design: r1.design, concept_created: !!r2?.concept_url,
-      note: "The app is now showing the sketch to the customer. Confirm size + price next." });
+    const debranded = (r2 as { debranded?: string | null })?.debranded ?? null;
+    return JSON.stringify({
+      design: r1.design, concept_created: !!r2?.concept_url,
+      concept_path: r2?.concept_path ?? null,
+      note: !r2?.concept_url
+        ? "No sketch could be rendered (the design still stands — describe it in words)."
+        : debranded === "colors"
+          ? "IMPORTANT: the character is trademarked and the image model rejected the exact look — the sketch shown is an ORIGINAL interpretation whose COLORS DIFFER from the request. Tell the customer honestly that the sketch's colors had to change for copyright reasons, and that Lulu will crochet the piece in the colors THEY asked for."
+          : debranded === "details"
+            ? "Note: the character is trademarked, so the sketch is an original interpretation — same colors as requested, but logos/exact patterns were simplified. Mention this briefly to the customer."
+            : "The app is now showing the sketch to the customer. Confirm size + price next.",
+    });
   }
 
   if (name === "create_checkout") {
+    // Safety net: the sketch shown in this conversation follows the order even
+    // if the model didn't thread concept_path through the tool call
+    let conceptPath = String(input.concept_path ?? "");
+    if (!/^concepts\/[\w-]+\.png$/.test(conceptPath) && chatId) {
+      const { data: rows } = await admin.from("chat_messages")
+        .select("meta").eq("chat_id", chatId).not("meta", "is", null)
+        .order("created_at", { ascending: false }).limit(10);
+      for (const row of rows ?? []) {
+        const acts = (row.meta as { actions?: { type?: string; path?: string }[] })?.actions ?? [];
+        const c = acts.find((a) => a.type === "concept" && a.path);
+        if (c?.path) { conceptPath = c.path; break; }
+      }
+    }
     const r = await fetch(`${FN_BASE}/create-checkout`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: input.name, email: input.email, cat_id: input.cat_id, size_idx: input.size_idx,
         rush: input.rush, desc: input.desc, colors: input.colors, lang: input.lang,
-        concept_path: input.concept_path || undefined,
+        concept_path: conceptPath || undefined,
         embedded: true,
       }),
     }).then((r) => r.json());
@@ -329,7 +358,7 @@ Deno.serve(async (req) => {
     for (const tu of toolUses) {
       let out: string;
       try {
-        out = await runTool(tu.name, tu.input as Record<string, unknown>, jwtEmail, actions, body.embedded === true);
+        out = await runTool(tu.name, tu.input as Record<string, unknown>, jwtEmail, actions, body.embedded === true, chatId);
       } catch (e) {
         out = `tool error: ${String(e).slice(0, 200)}`;
       }
