@@ -56,7 +56,7 @@
   /* ---------- Bilingual strings ---------- */
   var STR = { en: {
     navGallery: 'Gallery', navHow: 'How it works', navPricing: 'Pricing', navStory: 'Our story', navCta: 'Start your piece',
-    navAccount: '👤 My account', footAccount: 'My orders & account',
+    navAccount: 'My account', footAccount: 'My orders & account',
     heroEyebrow: 'Custom crochet studio · Boston', heroTitle: 'If you can imagine it, we can', heroTitleEm: 'crochet it.',
     heroSub: 'One-of-one dolls, heirloom blankets and little wonders — hand-stitched to your idea by Lulu and her artisans, and shipped anywhere in the world.',
     heroCta: 'Start your piece', heroCta2: 'See the work', fromChip: 'Pieces from',
@@ -139,7 +139,7 @@
     depositLabel: '40% deposit due today', balanceLabel: 'Balance when it ships'
   }, es: {
     navGallery: 'Galería', navHow: 'Cómo funciona', navPricing: 'Precios', navStory: 'Nuestra historia', navCta: 'Crea tu pieza',
-    navAccount: '👤 Mi cuenta', footAccount: 'Mis pedidos y mi cuenta',
+    navAccount: 'Mi cuenta', footAccount: 'Mis pedidos y mi cuenta',
     heroEyebrow: 'Estudio de crochet a medida · Boston', heroTitle: 'Si lo puedes imaginar, lo podemos', heroTitleEm: 'tejer.',
     heroSub: 'Muñecos únicos, cobijas de herencia y pequeñas maravillas — tejidos a mano según tu idea por Lulu y sus artesanas, con envío a todo el mundo.',
     heroCta: 'Crea tu pieza', heroCta2: 'Ver el trabajo', fromChip: 'Piezas desde',
