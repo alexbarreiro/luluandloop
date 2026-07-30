@@ -25,6 +25,10 @@
     'background:#2A2A33;color:#FFF4F2;border:none;border-radius:999px;padding:8px 18px 8px 8px;cursor:pointer;' +
     'box-shadow:0 12px 30px -8px rgba(42,42,51,.45);font-family:inherit;font-weight:800;font-size:14px;}' +
     '#lulu-chat-launch:hover{background:#E4657E;}' +
+    '#lulu-chat-launch{transition:bottom .25s ease;}' +
+    '.lc-spk{border:1px solid #F0E2D8;background:#FFFEFC;border-radius:50%;width:26px;height:26px;font-size:12px;' +
+    'cursor:pointer;flex-shrink:0;align-self:center;margin-left:4px;line-height:1;padding:0;}' +
+    '.lc-spk.on{background:#E4657E;border-color:#E4657E;}' +
     '#lulu-chat-launch img{width:38px;height:38px;border-radius:50%;border:2px solid #E4657E;display:block;}' +
     '#lulu-chat-panel{position:fixed;right:18px;bottom:18px;z-index:195;width:min(390px,calc(100vw - 24px));' +
     'height:min(620px,calc(100vh - 40px));background:#FFF8F0;border:1px solid #F0E2D8;border-radius:20px;' +
@@ -107,7 +111,8 @@
       if (m.role === 'me') {
         html += '<div class="lc-b lc-me">' + esc(m.text) + '</div>';
       } else {
-        html += '<div class="lc-row"><img src="' + AV + '" alt=""><div class="lc-b lc-lulu">' + esc(m.text) + '</div></div>';
+        html += '<div class="lc-row"><img src="' + AV + '" alt=""><div class="lc-b lc-lulu">' + esc(m.text) + '</div>' +
+          (window.speechSynthesis ? '<button class="lc-spk" title="' + T('Hear Lulu (beta)', 'Escuchar a Lulu (beta)') + '" aria-label="' + T('Hear this message', 'Escuchar este mensaje') + '">🔊</button>' : '') + '</div>';
         if (m.concept) {
           html += '<div class="lc-concept"><img src="' + esc(m.concept) + '" alt="AI concept"><p>' +
             T('AI sketch — Lulu crochets the real one 💗', 'Boceto IA — Lulu teje la de verdad 💗') + '</p></div>';
@@ -127,6 +132,12 @@
     msgsEl.innerHTML = html;
     typingEl.style.display = busy ? 'block' : 'none';
     msgsEl.scrollTop = msgsEl.scrollHeight;
+    Array.prototype.forEach.call(msgsEl.querySelectorAll('.lc-spk'), function (b) {
+      b.addEventListener('click', function () {
+        var bubble = b.parentElement.querySelector('.lc-lulu');
+        if (bubble) speak(bubble.textContent, b);
+      });
+    });
     Array.prototype.forEach.call(msgsEl.querySelectorAll('.lc-pay'), function (b) {
       b.addEventListener('click', function () {
         var m = messages.filter(function (x) { return x.checkout && x.checkout.code === b.getAttribute('data-code'); })[0];
@@ -330,6 +341,60 @@
     fitPanel();
     render();
     if (!isMobile) inputEl.focus();
+  }
+
+  /* Keep the launcher clear of any fixed action bars (wizard total bar, etc.).
+     Any page can also mark elements with [data-lulu-avoid]. */
+  function avoidBars() {
+    if (panel && panel.style.display !== 'none' &&
+        window.matchMedia('(max-width: 560px)').matches) return; // full-screen chat: launcher hidden
+    var lift = 0;
+    var els = document.querySelectorAll('.mbar, [data-lulu-avoid]');
+    Array.prototype.forEach.call(els, function (el) {
+      var cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return;
+      var r = el.getBoundingClientRect();
+      if (r.height > 0 && r.bottom > window.innerHeight - 4 && r.top < window.innerHeight) {
+        lift = Math.max(lift, Math.round(window.innerHeight - r.top) + 10);
+      }
+    });
+    launch.style.bottom = lift
+      ? 'calc(' + (18 + lift) + 'px + env(safe-area-inset-bottom))'
+      : '';
+  }
+  setInterval(avoidBars, 700);
+  window.addEventListener('resize', avoidBars);
+  window.addEventListener('hashchange', function () { setTimeout(avoidBars, 150); });
+  avoidBars();
+
+  /* ---- 🔊 read Lulu's messages aloud (beta) ---- */
+  var voices = [];
+  function loadVoices() { voices = window.speechSynthesis ? speechSynthesis.getVoices() : []; }
+  if (window.speechSynthesis) {
+    loadVoices();
+    speechSynthesis.addEventListener('voiceschanged', loadVoices);
+  }
+  var speakingBtn = null;
+  function speak(text, btn) {
+    if (!window.speechSynthesis) return;
+    if (speakingBtn === btn && speechSynthesis.speaking) {
+      speechSynthesis.cancel();
+      btn.classList.remove('on');
+      speakingBtn = null;
+      return;
+    }
+    speechSynthesis.cancel();
+    if (speakingBtn) speakingBtn.classList.remove('on');
+    var u = new SpeechSynthesisUtterance(text.replace(/[🧶💗🐢✨📦⭐💳]/g, ''));
+    u.lang = ES ? 'es-MX' : 'en-US';
+    var pref = voices.filter(function (v) { return v.lang && v.lang.indexOf(ES ? 'es' : 'en') === 0; });
+    var mx = pref.filter(function (v) { return /MX|US/.test(v.lang); });
+    if ((mx[0] || pref[0])) u.voice = mx[0] || pref[0];
+    u.rate = 1.0; u.pitch = 1.05;
+    u.onend = u.onerror = function () { btn.classList.remove('on'); speakingBtn = null; };
+    btn.classList.add('on');
+    speakingBtn = btn;
+    speechSynthesis.speak(u);
   }
 
   launch.addEventListener('click', openPanel);
