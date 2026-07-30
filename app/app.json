@@ -22,7 +22,6 @@
     },
     "plugins": [
       "expo-web-browser",
-      "expo-status-bar",
       [
         "expo-splash-screen",
         {

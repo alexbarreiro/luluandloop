@@ -61,6 +61,10 @@
     'font-size:16px;color:#2A2A33;font-family:inherit;resize:none;max-height:96px;min-height:40px;}' +
     '.lc-send{background:#E4657E;border:none;border-radius:50%;width:40px;height:40px;color:#fff;font-size:16px;' +
     'cursor:pointer;font-weight:800;flex-shrink:0;}' +
+    '.lc-mic{background:#FFFEFC;border:1px solid #F0E2D8;border-radius:50%;width:40px;height:40px;font-size:16px;' +
+    'cursor:pointer;flex-shrink:0;line-height:1;}' +
+    '.lc-mic.rec{background:#E4657E;border-color:#E4657E;animation:lcpulse 1.2s infinite;}' +
+    '@keyframes lcpulse{0%,100%{box-shadow:0 0 0 0 rgba(228,101,126,.4);}50%{box-shadow:0 0 0 8px rgba(228,101,126,0);}}' +
     '.lc-send:disabled{opacity:.5;}' +
     '#lulu-chat-stripe{position:fixed;inset:0;z-index:220;background:rgba(42,42,51,.55);display:flex;' +
     'align-items:center;justify-content:center;padding:18px;}' +
@@ -264,6 +268,7 @@
       '<div class="lc-typing" style="display:none;padding:0 14px 6px">' + T('Lulu is typing…', 'Lulu está escribiendo…') + '</div>' +
       '<div class="lc-compose"><textarea rows="1" placeholder="' +
       T('Tell Lulu your idea…', 'Cuéntale tu idea a Lulu…') + '"></textarea>' +
+      '<button class="lc-mic" aria-label="' + T('Dictate', 'Dictar') + '" hidden>🎤</button>' +
       '<button class="lc-send" aria-label="Send">➤</button></div>';
     document.body.appendChild(panel);
     msgsEl = panel.querySelector('.lc-msgs');
@@ -285,6 +290,41 @@
     inputEl.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
+
+    /* ---- dictation: talk to Lulu instead of typing ---- */
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var micEl = panel.querySelector('.lc-mic');
+    if (SR && micEl) {
+      micEl.hidden = false;
+      var rec = null;
+      micEl.addEventListener('click', function () {
+        if (rec) { rec.stop(); return; }
+        rec = new SR();
+        rec.lang = ES ? 'es-MX' : 'en-US';
+        rec.continuous = true;
+        rec.interimResults = true;
+        var base = inputEl.value ? inputEl.value.replace(/\s+$/, '') + ' ' : '';
+        micEl.classList.add('rec');
+        micEl.textContent = '⏹';
+        rec.onresult = function (ev) {
+          var text = '';
+          for (var i = 0; i < ev.results.length; i++) text += ev.results[i][0].transcript + (ev.results[i].isFinal ? ' ' : '');
+          inputEl.value = (base + text).replace(/\s+/g, ' ');
+        };
+        rec.onend = function () {
+          micEl.classList.remove('rec');
+          micEl.textContent = '🎤';
+          rec = null;
+          inputEl.focus();
+        };
+        rec.onerror = function () {
+          micEl.classList.remove('rec');
+          micEl.textContent = '🎤';
+          rec = null;
+        };
+        try { rec.start(); } catch (e) { rec = null; micEl.classList.remove('rec'); micEl.textContent = '🎤'; }
+      });
+    }
     launch.style.display = 'none';
     lockBody();
     fitPanel();
