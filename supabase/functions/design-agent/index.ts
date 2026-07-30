@@ -63,7 +63,13 @@ Deno.serve(async (req) => {
     const imagePrompt = String(body.image_prompt ?? "").trim().slice(0, 1200);
     if (imagePrompt.length < 8) return json({ error: "image_prompt required" }, 400);
     if (!OPENAI_KEY) return json({ concept_path: null, concept_url: null });
-    const rendered = await renderConcept(imagePrompt);
+    let rendered = await renderConcept(imagePrompt);
+    // Trademarked characters get blocked by the image model's moderation —
+    // rewrite the prompt generically (same look, no names) and retry once
+    if (!rendered.concept_path && rendered.blocked) {
+      const safe = await debrandPrompt(imagePrompt);
+      if (safe) rendered = await renderConcept(safe);
+    }
     return json(rendered);
   }
 
@@ -96,7 +102,16 @@ colors: up to 4, from the customer's words or tasteful choices that fit.
 image_prompt: describe the FINISHED piece for an image model — always as a
 handmade crochet/amigurumi object photographed on a warm cream background, soft
 natural light, visible yarn stitch texture. Never a real animal/person — always
-the crocheted version.`,
+the crocheted version.
+CRITICAL for image_prompt: never name trademarked characters, franchises, brands,
+logos or real people ("Mickey Mouse", "Pokémon", "Spider-Man", "Messi"…) — the
+image model blocks the prompt AND any output that looks like the protected
+character. So for famous characters, describe an ORIGINAL interpretation: keep
+the species, silhouette and joyful spirit, but change the signature outfit
+colors/details so the render is clearly an original design (famous mouse → "a
+cute original cartoon mouse with big round ears, teal overalls with a yellow
+patch and a red neckerchief"). desc_en/desc_es MAY keep the customer's own
+words; image_prompt must be brand-free and visually original.`,
     messages: [{ role: "user", content: `Customer language: ${lang}\nCustomer's idea (dictated): ${transcript}` }],
   });
 
@@ -117,11 +132,41 @@ the crocheted version.`,
   // legacy single-call behavior.
   if (stage === "design") return json({ design });
 
-  const rendered = OPENAI_KEY ? await renderConcept(design.image_prompt) : { concept_path: null, concept_url: null };
+  let rendered = OPENAI_KEY ? await renderConcept(design.image_prompt) : { concept_path: null, concept_url: null };
+  if (OPENAI_KEY && !rendered.concept_path && (rendered as { blocked?: boolean }).blocked) {
+    const safe = await debrandPrompt(design.image_prompt);
+    if (safe) rendered = await renderConcept(safe);
+  }
   return json({ design, ...rendered });
 });
 
-async function renderConcept(imagePrompt: string) {
+// Rewrites an image prompt so it passes moderation. The image model blocks
+// both trademarked NAMES and any OUTPUT that resembles the protected character,
+// so the rewrite must produce a clearly-original design: same species,
+// silhouette and spirit, different signature outfit/colors/details.
+async function debrandPrompt(imagePrompt: string): Promise<string | null> {
+  try {
+    const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY });
+    const r = await anthropic.messages.create({
+      model: "claude-opus-5",
+      max_tokens: 500,
+      output_config: { effort: "low" },
+      system: "You rewrite image-generation prompts that were blocked for depicting trademarked characters. " +
+        "Rewrite the prompt as a clearly ORIGINAL character: keep the species, silhouette, size and joyful " +
+        "spirit, but remove every name and change the signature outfit colors and details so the rendered " +
+        "image cannot be mistaken for the protected character (e.g. a famous mouse's red shorts + yellow " +
+        "shoes become teal overalls + a red neckerchief). Keep everything else — crochet/amigurumi style, " +
+        "background, lighting, composition — exactly as written. Reply with ONLY the rewritten prompt.",
+      messages: [{ role: "user", content: imagePrompt }],
+    });
+    const t = r.content.find((b) => b.type === "text");
+    return t && t.type === "text" && t.text.trim().length > 12 ? t.text.trim() : null;
+  } catch { return null; }
+}
+
+async function renderConcept(imagePrompt: string): Promise<{
+  concept_path: string | null; concept_url: string | null; blocked?: boolean;
+}> {
   let conceptPath: string | null = null;
   let conceptUrl: string | null = null;
   try {
@@ -137,6 +182,9 @@ async function renderConcept(imagePrompt: string) {
     });
     const imgData = await img.json();
     const b64 = imgData?.data?.[0]?.b64_json;
+    if (!b64 && imgData?.error?.code === "moderation_blocked") {
+      return { concept_path: null, concept_url: null, blocked: true };
+    }
     if (b64) {
       const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
       conceptPath = `concepts/${crypto.randomUUID()}.png`;

@@ -86,6 +86,7 @@
     conceptBtn: '✨ Preview my piece with AI', conceptWorking: '✨ Sketching your idea…',
     conceptNote: 'An AI sketch of your idea — Lulu crochets the real one, stitch by stitch. 💗',
     conceptErr: 'The sketch didn’t work this time — your words are all Lulu needs anyway.',
+    conceptIp: 'The AI can\u2019t sketch copyrighted characters — but Lulu absolutely can work from your idea and reference photos. 💗',
     micHint: 'Listening… describe your piece',
     aiSteps: ['Reading your idea…', 'Choosing the yarns…', 'Sketching the shape…', 'Stitching the details…', 'Final touches…'],
     aiDesignReady: 'Design ready — sketching it now…',
@@ -167,6 +168,7 @@
     conceptBtn: '✨ Ver mi pieza con IA', conceptWorking: '✨ Dibujando tu idea…',
     conceptNote: 'Un boceto de tu idea hecho con IA — Lulu teje la de verdad, puntada a puntada. 💗',
     conceptErr: 'El boceto no salió esta vez — con tus palabras le basta a Lulu.',
+    conceptIp: 'La IA no puede dibujar personajes con derechos de autor — pero Lulu sí puede trabajar tu idea con tus palabras y fotos de referencia. 💗',
     micHint: 'Escuchando… describe tu pieza',
     aiSteps: ['Leyendo tu idea…', 'Eligiendo los estambres…', 'Dibujando la forma…', 'Tejiendo los detalles…', 'Últimos toques…'],
     aiDesignReady: 'Diseño listo — dibujando el boceto…',
@@ -807,6 +809,8 @@
             ci.src = img.concept_url;
           } else {
             aiProgressDone(false);
+            // never fail silently — tell them the sketch didn't happen and why it's fine
+            siteToast(img && img.blocked ? t().conceptIp : t().conceptErr);
           }
           renderAll();
         }).catch(function () {
