@@ -327,9 +327,16 @@ textarea { resize: vertical; }
   border-top-color: var(--accent-light); border-radius: 50%; display: inline-block;
   animation: spin .7s linear infinite;
 }
-.checkout-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
-.btn-back-step { border: none; cursor: pointer; background: none; font-weight: 800; font-size: 13.5px; color: var(--text-2); padding: 0; }
-.stripe-note { font-size: 12.5px; color: var(--text-2); font-weight: 700; }
+.checkout-foot { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-top: 16px; }
+.btn-back-step { border: none; cursor: pointer; background: none; font-weight: 800; font-size: 13.5px; color: var(--text-2); padding: 0; white-space: nowrap; flex-shrink: 0; }
+.stripe-note { font-size: 12.5px; color: var(--text-2); font-weight: 700; text-align: right; }
+/* Narrow screens: the note is long (especially in Spanish) — stack it above
+   the back button instead of fighting for one row */
+@media (max-width: 640px) {
+  .checkout-foot { flex-direction: column-reverse; gap: 10px; }
+  .stripe-note { text-align: center; }
+  .btn-back-step { padding: 6px 0; }
+}
 .stripe-note b { font-weight: 900; }
 .checkout-hint { font-size: 12.5px; color: var(--pink); font-weight: 700; margin-top: 10px; text-align: center; display: none; }
 .checkout-hint.show { display: block; }
