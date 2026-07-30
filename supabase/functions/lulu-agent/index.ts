@@ -283,14 +283,30 @@ Deno.serve(async (req) => {
   }
   if (JSON.stringify(history).length > 120000) history = history.slice(-40);
 
-  const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY });
+  // maxRetries handles transient 429/5xx/529 overloads with backoff
+  const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY, maxRetries: 5 });
   const actions: Action[] = [];
   const messages = history as Anthropic.MessageParam[];
 
+  // Overload-resilient call: when Opus returns 529 even after SDK retries,
+  // fall back to Sonnet once — different capacity pool, same conversation.
+  async function createResilient(params: Omit<Anthropic.MessageCreateParamsNonStreaming, "model">) {
+    try {
+      return await anthropic.messages.create({ model: "claude-opus-5", ...params });
+    } catch (e) {
+      const status = (e as { status?: number })?.status ?? 0;
+      const msg = String((e as Error)?.message ?? e);
+      // any server-side failure (500/529/overloaded) → try the other pool
+      if (status < 500 && !/overloaded|529/i.test(msg)) throw e;
+      console.error("opus unavailable (" + (status || msg.slice(0, 40)) + ") — falling back to sonnet");
+      return await anthropic.messages.create({ model: "claude-sonnet-5", ...params });
+    }
+  }
+
   let reply = "";
+  try {
   for (let i = 0; i < 6; i++) {
-    const response = await anthropic.messages.create({
-      model: "claude-opus-5",
+    const response = await createResilient({
       max_tokens: 1500,
       output_config: { effort: "low" },
       system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
@@ -322,6 +338,17 @@ Deno.serve(async (req) => {
     messages.push({ role: "user", content: results });
   }
 
+  } catch (e) {
+    console.error("lulu-agent anthropic loop failed:", e);
+    // Transient overloads become a warm "give me a second" instead of an error
+    // bubble; the ids keep the client's history poll from duplicating the turn.
+    return json({
+      reply: "¡Uy! Tengo muchas manos en el estambre ahora mismo 🧶 Dame unos segundos y repítemelo, porfa. / So many hands on the yarn right now — try me again in a few seconds 💗",
+      actions: [], chat_id: chatId, transient: true,
+      message_ids: [savedUserRow?.id].filter(Boolean),
+      last_at: savedUserRow?.created_at ?? null,
+    });
+  }
   if (!reply) reply = "Hmm, se me enredó el estambre — could you say that once more? 🧶";
   let savedLuluRow: { id: string; created_at: string } | null = null;
   if (chatId) {

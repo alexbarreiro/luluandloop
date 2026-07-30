@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
 
   if (transcript.length < 8) return json({ error: "tell us a little more about your idea" }, 400);
 
-  const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY });
+  const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY, maxRetries: 5 });
   const response = await anthropic.messages.create({
     model: "claude-opus-5",
     max_tokens: 2000,
@@ -146,7 +146,7 @@ words; image_prompt must be brand-free and visually original.`,
 // silhouette and spirit, different signature outfit/colors/details.
 async function debrandPrompt(imagePrompt: string): Promise<string | null> {
   try {
-    const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY });
+    const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY, maxRetries: 5 });
     const r = await anthropic.messages.create({
       model: "claude-opus-5",
       max_tokens: 500,

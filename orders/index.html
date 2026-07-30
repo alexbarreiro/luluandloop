@@ -84,6 +84,18 @@
   .pay-line:last-of-type { border-bottom:none; }
   .courtesy { color:#3E6B4A; font-weight:800; }
   #o-photo { width:72px; height:72px; border-radius:16px; object-fit:cover; border:1px solid var(--border); }
+  .ptop { display:none; align-items:center; gap:6px; margin-left:auto; margin-right:14px; }
+  .ptop button, .ptop a { border:1px solid transparent; background:none; font:inherit; font-weight:800;
+    font-size:13px; color:var(--t2); cursor:pointer; padding:8px 14px; border-radius:999px; text-decoration:none; }
+  .ptop button.on { background:var(--soft); color:var(--deep); }
+  .ptop button:hover, .ptop a:hover { color:var(--pink); }
+  .ptop .pt-out { border-color:var(--border); color:var(--ink); }
+  .ptop .pt-out:hover { border-color:var(--pink); color:var(--pink); }
+  @media (min-width:721px) {
+    .pnav { display:none !important; }
+    body.has-pnav .wrap { padding-bottom:80px; }
+    .ptop:not([hidden]) { display:flex; }
+  }
   .pnav { position:fixed; left:0; right:0; bottom:0; z-index:60; display:flex; justify-content:space-around;
     background:rgba(255,254,252,.97); backdrop-filter:blur(8px); border-top:1px solid var(--border);
     padding:8px 10px calc(8px + env(safe-area-inset-bottom)); }
@@ -125,6 +137,12 @@
 <div class="wrap">
   <div class="top">
     <a class="word" href="/">Lulu <span class="amp">&amp;</span> Loop</a>
+    <nav class="ptop" id="ptop" hidden>
+      <button id="pt-pieces" class="on"></button>
+      <button id="pt-profile"></button>
+      <a href="/" id="pt-shop"></a>
+      <button id="pt-logout" class="pt-out"></button>
+    </nav>
     <div class="lang-t"><button id="l-en">EN</button><button id="l-es">ES</button></div>
   </div>
 
@@ -282,7 +300,7 @@
   </div>
 </div>
 
-<script src="/js/config.js?v=20260731i"></script>
+<script src="/js/config.js?v=20260731j"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
@@ -448,6 +466,10 @@
     $('pn-pieces-l').textContent = t().pnPieces;
     $('pn-profile-l').textContent = t().pnProfile;
     $('pn-shop-l').textContent = t().pnShop;
+    $('pt-pieces').textContent = t().pnPieces;
+    $('pt-profile').textContent = t().pnProfile;
+    $('pt-shop').textContent = t().pnShop;
+    $('pt-logout').textContent = t().signout;
     fillCountries();
     $('list-title').textContent = t().listTitle;
     $('btn-signout').textContent = t().signout;
@@ -477,9 +499,13 @@
     var nav = $('pnav');
     var signedIn = !!state.jwt;
     nav.hidden = !signedIn || view === 'v-access' || view === 'v-reset';
+    $('ptop').hidden = nav.hidden;
     document.body.classList.toggle('has-pnav', !nav.hidden);
-    $('pn-pieces').classList.toggle('on', view === 'v-list' || view === 'v-order');
+    var onPieces = view === 'v-list' || view === 'v-order';
+    $('pn-pieces').classList.toggle('on', onPieces);
     $('pn-profile').classList.toggle('on', view === 'v-profile');
+    $('pt-pieces').classList.toggle('on', onPieces);
+    $('pt-profile').classList.toggle('on', view === 'v-profile');
   }
 
   function renderOrder() {
@@ -727,6 +753,9 @@
     renderList();
   });
   $('pn-profile').addEventListener('click', function () { show('v-profile'); loadProfile(); });
+  $('pt-pieces').addEventListener('click', function () { $('pn-pieces').click(); });
+  $('pt-profile').addEventListener('click', function () { show('v-profile'); loadProfile(); });
+  $('pt-logout').addEventListener('click', function () { $('btn-signout').click(); });
 
   $('c-file').addEventListener('change', function () {
     $('c-file-name').textContent = $('c-file').files[0] ? $('c-file').files[0].name : '';
@@ -948,6 +977,6 @@
   } else show('v-access');
 })();
 </script>
-<script src="/js/lulu-chat.js?v=20260731i" defer></script>
+<script src="/js/lulu-chat.js?v=20260731j" defer></script>
 </body>
 </html>
