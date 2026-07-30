@@ -504,6 +504,33 @@ main { flex: 1; padding: 24px 18px 60px; min-width: 0; }
 }
 .gate-demo-note { font-size: 12px; font-weight: 700; color: var(--muted); margin-top: 14px; line-height: 1.5; }
 
+/* ---------- Lulu AI chats ---------- */
+.chat-card {
+  display: flex; align-items: center; gap: 12px; background: var(--card);
+  border: 1px solid var(--border); border-radius: 14px; padding: 13px 15px;
+  margin-bottom: 9px; cursor: pointer; width: 100%; text-align: left; font-family: inherit;
+}
+.chat-card:hover { border-color: var(--pink); }
+.chat-avatar {
+  width: 38px; height: 38px; border-radius: 50%; background: var(--pink-soft);
+  color: var(--pink-deep); font-weight: 800; display: flex; align-items: center;
+  justify-content: center; flex-shrink: 0; font-size: 15px;
+}
+.chat-who { font-weight: 800; font-size: 13.5px; color: var(--ink); }
+.chat-prev { font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; max-width: 100%; }
+.chat-when { margin-left: auto; font-size: 11px; color: var(--muted); font-weight: 700;
+  flex-shrink: 0; text-align: right; }
+.chat-thread-head { font-weight: 800; font-size: 15px; margin-bottom: 10px; color: var(--ink); }
+.chat-date-sep { text-align: center; font-size: 11px; font-weight: 800; color: var(--muted);
+  margin: 12px 0 6px; letter-spacing: .04em; text-transform: uppercase; }
+.bubble.staff { background: var(--green-bg); border-color: #CBDCC8; align-self: flex-end; }
+.bubble .meta-act { font-size: 11px; color: var(--pink-deep); font-weight: 800; margin-top: 4px; }
+
+/* ---------- Customers (improved) ---------- */
+.cust-stats { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.cust-ltv { font-weight: 900; color: var(--green-tx); }
+
 /* ---------- Mobile (kept last so it wins the cascade) ---------- */
 @media (max-width: 760px) {
   .layout { flex-direction: column; }

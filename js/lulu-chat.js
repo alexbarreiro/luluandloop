@@ -93,6 +93,60 @@
   try { messages = JSON.parse(localStorage.getItem('lulu.webchat') || 'null') || [HELLO]; }
   catch (e) { messages = [HELLO]; }
   var busy = false;
+  var seenIds = {};
+  var lastAt = null;
+  var pollTimer = null;
+  function visitorId() {
+    var v = null;
+    try { v = localStorage.getItem('lulu.visitor'); } catch (e) { /* ignore */ }
+    if (!v) {
+      v = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+        : 'v-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+      try { localStorage.setItem('lulu.visitor', v); } catch (e) { /* ignore */ }
+    }
+    return v;
+  }
+  function mapServerMsg(m) {
+    var out = { role: m.role === 'user' ? 'me' : m.role === 'staff' ? 'staff' : 'lulu', text: m.body };
+    if (m.staff_name) out.staffName = m.staff_name;
+    var acts = (m.meta && m.meta.actions) || [];
+    acts.forEach(function (a) {
+      if (a.type === 'concept') out.concept = a.url;
+      if (a.type === 'checkout') out.checkout = a;
+      if (a.type === 'orders') out.orders = a.orders;
+    });
+    return out;
+  }
+  function loadHistory(sinceOnly) {
+    var payload = { history: true, visitor_id: visitorId() };
+    if (sinceOnly && lastAt) payload.since = lastAt;
+    return fetch(cfg.SUPABASE_URL + '/functions/v1/lulu-agent', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); }).then(function (res) {
+      var fresh = (res && res.messages) || [];
+      if (!fresh.length) return false;
+      if (!sinceOnly) { messages = []; seenIds = {}; }
+      var added = false;
+      fresh.forEach(function (m) {
+        if (seenIds[m.id]) return;
+        seenIds[m.id] = true;
+        lastAt = m.created_at;
+        messages.push(mapServerMsg(m));
+        added = true;
+      });
+      if (!messages.length) messages = [HELLO];
+      if (added) { save(); render(); }
+      return added;
+    }).catch(function () { return false; });
+  }
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(function () {
+      if (!busy && panel && panel.style.display !== 'none') loadHistory(true);
+    }, 6000);
+  }
+  function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
 
   function save() {
     try { localStorage.setItem('lulu.webchat', JSON.stringify(messages.slice(-40))); } catch (e) { /* ignore */ }
@@ -110,6 +164,10 @@
     messages.forEach(function (m) {
       if (m.role === 'me') {
         html += '<div class="lc-b lc-me">' + esc(m.text) + '</div>';
+      } else if (m.role === 'staff') {
+        html += '<div class="lc-row"><img src="' + AV + '" alt=""><div class="lc-b lc-lulu">' +
+          '<div style="font-size:10px;font-weight:800;color:#9A4B60;margin-bottom:2px">👩‍🎨 ' +
+          esc(m.staffName || T('Studio team', 'Equipo del estudio')) + '</div>' + esc(m.text) + '</div></div>';
       } else {
         html += '<div class="lc-row"><img src="' + AV + '" alt=""><div class="lc-b lc-lulu">' + esc(m.text) + '</div>' +
           (window.speechSynthesis ? '<button class="lc-spk" title="' + T('Hear Lulu (beta)', 'Escuchar a Lulu (beta)') + '" aria-label="' + T('Hear this message', 'Escuchar este mensaje') + '">🔊</button>' : '') + '</div>';
@@ -191,15 +249,13 @@
     inputEl.value = '';
     messages.push({ role: 'me', text: text });
     busy = true; save(); render();
-    var history = messages.filter(function (m) { return m.role === 'me' || m.role === 'lulu'; })
-      .slice(-16)
-      .map(function (m) { return { role: m.role === 'me' ? 'user' : 'assistant', content: m.text }; });
     fetch(cfg.SUPABASE_URL + '/functions/v1/lulu-agent', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        messages: history,
-        jwt: window.LULU_CHAT_JWT || undefined,
-        embedded: !!cfg.STRIPE_PK
+        visitor_id: visitorId(),
+        message: text,
+        source: 'web',
+        jwt: window.LULU_CHAT_JWT || undefined
       })
     }).then(function (r) { return r.json(); }).then(function (res) {
       busy = false;
@@ -265,6 +321,7 @@
     if (panel) {
       panel.style.display = 'flex'; launch.style.display = 'none';
       lockBody(); fitPanel(); render();
+      loadHistory(false); startPolling();
       if (!isMobile) inputEl.focus();
       return;
     }
@@ -290,6 +347,7 @@
       panel.style.display = 'none';
       launch.style.display = 'flex';
       unlockBody();
+      stopPolling();
     });
     // when the keyboard opens on focus, re-fit and keep the thread pinned
     inputEl.addEventListener('focus', function () {
@@ -340,6 +398,8 @@
     lockBody();
     fitPanel();
     render();
+    loadHistory(false);
+    startPolling();
     if (!isMobile) inputEl.focus();
   }
 

@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,400;0,6..12,600;0,6..12,700;0,6..12,800;0,6..12,900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/studio.css?v=20260730b">
+<link rel="stylesheet" href="/css/studio.css?v=20260730c">
 </head>
 <body>
 
@@ -101,6 +101,21 @@
         <input type="search" id="customer-search" class="search-input" placeholder="Search name, email, city…">
       </div>
       <div class="customer-list" id="customer-list"></div>
+    </div>
+    <div class="view" id="view-chats">
+      <div id="chat-list"></div>
+      <div id="chat-thread-wrap" hidden>
+        <button class="btn-mini" id="chat-back" style="margin-bottom:12px">← All conversations</button>
+        <div class="chat-thread-head" id="chat-thread-head"></div>
+        <div class="thread" id="chat-thread" style="max-height:48vh"></div>
+        <div class="composer">
+          <textarea id="chat-reply" rows="2" placeholder="Write to this customer as the studio…"></textarea>
+          <div class="composer-row">
+            <span class="toolbar-note">They see it in their Lulu chat (web & app) — and Lulu AI keeps it in context.</span>
+            <button class="btn-primary btn-sm" id="chat-reply-send">Send</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="view" id="view-financials">
       <div class="fin-tiles" id="fin-tiles"></div>
@@ -210,9 +225,9 @@
 
 <div id="toast-region" role="status" aria-live="assertive" aria-atomic="true"></div>
 
-<script src="/js/config.js?v=20260730b"></script>
+<script src="/js/config.js?v=20260730c"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="/js/api.js?v=20260730b"></script>
-<script src="/js/studio.js?v=20260730b"></script>
+<script src="/js/api.js?v=20260730c"></script>
+<script src="/js/studio.js?v=20260730c"></script>
 </body>
 </html>

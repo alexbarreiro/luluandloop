@@ -158,11 +158,16 @@ async function runTool(name: string, input: Record<string, unknown>, jwtEmail: s
         name: input.name, email: input.email, cat_id: input.cat_id, size_idx: input.size_idx,
         rush: input.rush, desc: input.desc, colors: input.colors, lang: input.lang,
         concept_path: input.concept_path || undefined,
-        embedded,
+        embedded: true,
       }),
     }).then((r) => r.json());
     if ((r?.url || r?.client_secret) && r?.code) {
-      actions.push({ type: "checkout", url: r.url ?? null, client_secret: r.client_secret ?? null, code: r.code });
+      // non-embedded clients (mobile app) get a luluandloop.com payment page
+      // that mounts the embedded form — the customer never sees stripe.com
+      const url = r.url ?? (r.client_secret
+        ? `https://luluandloop.com/pay/#cs=${encodeURIComponent(r.client_secret)}`
+        : null);
+      actions.push({ type: "checkout", url, client_secret: r.client_secret ?? null, code: r.code });
       return JSON.stringify({ ok: true, order_code: r.code,
         note: "Payment button is now visible in the app. Tell them to tap it to pay the 40% deposit." });
     }
@@ -206,19 +211,71 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   if (!ANTHROPIC_KEY) return json({ error: "Lulu AI not configured yet" }, 501);
 
-  let body: { messages?: Array<{ role: string; content: unknown }>; jwt?: string; embedded?: boolean };
+  let body: {
+    messages?: Array<{ role: string; content: unknown }>;
+    message?: string; visitor_id?: string; history?: boolean; since?: string;
+    jwt?: string; embedded?: boolean; source?: string;
+  };
   try { body = await req.json(); } catch { return json({ error: "invalid JSON" }, 400); }
-  const history = Array.isArray(body.messages) ? body.messages.slice(-30) : [];
-  if (!history.length) return json({ error: "messages required" }, 400);
-  // basic abuse guard for a public endpoint
-  const totalChars = JSON.stringify(history).length;
-  if (totalChars > 60000) return json({ error: "conversation too long — start a fresh chat" }, 413);
 
   let jwtEmail: string | null = null;
   if (body.jwt) {
     const { data } = await admin.auth.getUser(body.jwt);
     jwtEmail = data?.user?.email?.toLowerCase() ?? null;
   }
+
+  const visitorId = String(body.visitor_id ?? "").slice(0, 64);
+
+  // ---- history fetch / polling for widget + app (visitor-scoped) ----
+  if (body.history && visitorId) {
+    const { data: chat } = await admin.from("chats").select("id").eq("visitor_id", visitorId).maybeSingle();
+    if (!chat) return json({ messages: [] });
+    let q = admin.from("chat_messages")
+      .select("id, role, body, meta, staff_name, created_at")
+      .eq("chat_id", chat.id).order("created_at", { ascending: true }).limit(200);
+    if (body.since) q = q.gt("created_at", String(body.since));
+    const { data: msgs } = await q;
+    return json({ messages: msgs ?? [] });
+  }
+
+  // ---- persistent conversation turn ----
+  let chatId: string | null = null;
+  let history: Array<{ role: string; content: unknown }> = [];
+  if (visitorId && typeof body.message === "string") {
+    const text = body.message.trim().slice(0, 2000);
+    if (!text) return json({ error: "empty message" }, 400);
+    let { data: chat } = await admin.from("chats").select("id, email").eq("visitor_id", visitorId).maybeSingle();
+    if (!chat) {
+      const ins = await admin.from("chats").insert({
+        visitor_id: visitorId, email: jwtEmail,
+        source: body.source === "app" ? "app" : "web",
+      }).select("id, email").single();
+      chat = ins.data;
+    } else if (jwtEmail && chat.email !== jwtEmail) {
+      await admin.from("chats").update({ email: jwtEmail }).eq("id", chat.id);
+    }
+    if (!chat) return json({ error: "could not open chat" }, 500);
+    chatId = chat.id as string;
+
+    // the agent sees the ENTIRE conversation (bounded), including human
+    // staff replies, so it never loses context
+    const { data: past } = await admin.from("chat_messages")
+      .select("role, body").eq("chat_id", chatId)
+      .order("created_at", { ascending: false }).limit(80);
+    const ordered = (past ?? []).reverse();
+    for (const m of ordered) {
+      if (m.role === "user") history.push({ role: "user", content: m.body });
+      else if (m.role === "lulu") history.push({ role: "assistant", content: m.body });
+      else history.push({ role: "assistant", content: "[Message written by the HUMAN studio team]: " + m.body });
+    }
+    history.push({ role: "user", content: text });
+    await admin.from("chat_messages").insert({ chat_id: chatId, role: "user", body: text });
+  } else {
+    // legacy stateless contract (older clients)
+    history = Array.isArray(body.messages) ? body.messages.slice(-30) : [];
+    if (!history.length) return json({ error: "messages required" }, 400);
+  }
+  if (JSON.stringify(history).length > 120000) history = history.slice(-40);
 
   const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY });
   const actions: Action[] = [];
@@ -260,5 +317,11 @@ Deno.serve(async (req) => {
   }
 
   if (!reply) reply = "Hmm, se me enredó el estambre — could you say that once more? 🧶";
-  return json({ reply, actions });
+  if (chatId) {
+    await admin.from("chat_messages").insert({
+      chat_id: chatId, role: "lulu", body: reply,
+      meta: actions.length ? { actions } : null,
+    });
+  }
+  return json({ reply, actions, chat_id: chatId });
 });

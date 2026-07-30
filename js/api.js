@@ -318,6 +318,9 @@
         saveOverride(order.code, { ready_to_ship_at: new Date().toISOString() });
         return Promise.resolve({ ok: true });
       },
+      listChats: function () { return Promise.resolve([]); },
+      listChatMessages: function () { return Promise.resolve([]); },
+      sendStaffChat: function () { return Promise.reject(new Error('Lulu AI chats need the cloud backend')); },
       manualShip: function (order, p) {
         var patch = { shipping_cost: p.cost,
           shipping_rate: { rate_id: 'manual', provider: p.provider || 'Manual', service: '', amount: String(p.cost), currency: 'USD', days: null } };
@@ -582,6 +585,20 @@
       manualShip: function (order, p) {
         return callFn('shippo', { action: 'manual-ship', order_id: order.id, cost: p.cost,
           price: p.price, provider: p.provider, tracking: p.tracking, label_url: p.label_url });
+      },
+      listChats: function () {
+        return sb().from('chats').select('*').order('last_message_at', { ascending: false })
+          .limit(200).then(function (r) { if (r.error) fail(r.error); return r.data; });
+      },
+      listChatMessages: function (chatId) {
+        return sb().from('chat_messages').select('*').eq('chat_id', chatId)
+          .order('created_at', { ascending: true }).limit(500)
+          .then(function (r) { if (r.error) fail(r.error); return r.data; });
+      },
+      sendStaffChat: function (chatId, body, staffName) {
+        return sb().from('chat_messages').insert({
+          chat_id: chatId, role: 'staff', body: body, staff_name: staffName
+        }).then(function (r) { if (r.error) fail(r.error); });
       },
       buyLabel: function (order, rateId) {
         return callFn('shippo', { action: 'buy', order_id: order.id, rate_id: rateId });

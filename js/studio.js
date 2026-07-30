@@ -101,16 +101,16 @@
 
   /* ---------- Header / nav ---------- */
   var NAVS = {
-    owner: [['board', '⬚', 'Order board'], ['team', '✿', 'Team & workload'], ['pay', '⟳', 'Payments'],
-            ['customers', '♡', 'Customers'], ['staff', '✚', 'Staff'], ['tasks', '✓', 'Tasks'],
-            ['financials', '∑', 'Financials'], ['payouts', '◈', 'Artisan payouts']],
-    supervisor: [['board', '⬚', 'Order board'], ['team', '✿', 'Team & workload'], ['pay', '⟳', 'Payments'],
+    owner: [['board', '⬚', 'Order board'], ['chats', '💬', 'Lulu AI'], ['team', '✿', 'Team & workload'],
+            ['pay', '⟳', 'Payments'], ['customers', '♡', 'Customers'], ['staff', '✚', 'Staff'],
+            ['tasks', '✓', 'Tasks'], ['financials', '∑', 'Financials'], ['payouts', '◈', 'Artisan payouts']],
+    supervisor: [['board', '⬚', 'Order board'], ['chats', '💬', 'Lulu AI'], ['team', '✿', 'Team & workload'], ['pay', '⟳', 'Payments'],
             ['customers', '♡', 'Customers'], ['tasks', '✓', 'Tasks']],
     artisan: [['mypieces', '⬚', 'My pieces'], ['mytasks', '✓', 'My tasks']]
   };
   var TITLES = { board: 'Order board', team: 'Team & workload', pay: 'Payments',
     staff: 'Staff', tasks: 'Tasks & content engine', mypieces: 'My pieces', mytasks: 'My tasks',
-    customers: 'Customers', payouts: 'Artisan payouts', financials: 'Financials' };
+    customers: 'Customers', payouts: 'Artisan payouts', financials: 'Financials', chats: 'Lulu AI conversations' };
 
   function renderNav() {
     var items = NAVS[state.me.role] || NAVS.artisan;
@@ -579,15 +579,20 @@
   }
 
   function renderCustomers() {
+    if (isManager() && !state.chats) {
+      S.listChats().then(function (chats) { state.chats = chats || []; renderCustomers(); })
+        .catch(function () { state.chats = []; });
+    }
     var byKey = {};
     state.orders.forEach(function (o) {
       var key = (o.email || o.customer || '?').toLowerCase();
       var c = byKey[key] || (byKey[key] = { name: o.customer, email: o.email || '', where: o.where_from || '',
-        address: null, shipName: '', orders: [], paid: 0 });
+        address: null, shipName: '', orders: [], paid: 0, lastAt: '' });
       c.orders.push(o);
       if (o.shipping_address) { c.address = o.shipping_address; c.shipName = o.shipping_name || ''; }
       if (depPaid(o)) c.paid += dep(o);
-      if (balPaid(o)) c.paid += bal(o);
+      if (balPaid(o)) { c.paid += bal(o) + (Number(o.shipping) || 0); }
+      if ((o.created_at || '') > c.lastAt) c.lastAt = o.created_at || '';
     });
     var q = state.customerQuery.toLowerCase();
     var list = Object.keys(byKey).map(function (k) { return byKey[k]; })
@@ -613,11 +618,20 @@
         '<div class="team-role">' + esc(c.email || '—') + (c.where ? ' · ' + esc(c.where) : '') + '</div></div>' +
         '<div class="cust-meta"><span class="chip soft">' + c.orders.length +
         (c.orders.length === 1 ? ' order' : ' orders') + '</span>' +
-        '<span class="chip green">' + fmt(c.paid) + ' paid</span></div></button>' +
+        '<span class="chip soft">' + c.orders.filter(function (o) { return o.stage === 4; }).length + ' shipped</span>' +
+        '<span class="chip green cust-ltv">' + fmt(c.paid) + ' lifetime</span>' +
+        (c.lastAt ? '<span class="chip mute">' + esc(fmtDate(c.lastAt)) + '</span>' : '') +
+        '</div></button>' +
         '<div class="customer-body" hidden>' +
         (c.address ? '<div class="cust-address">📦 ' + esc(c.shipName || c.name) + ' — ' + esc(formatAddress(c.address)) + '</div>'
           : '<div class="cust-address muted">No shipping address on file yet (collected at deposit checkout).</div>') +
         ordersHtml +
+        (function () {
+          if (!isManager() || !c.email || !state.chats) return '';
+          var chat = state.chats.find(function (ch) { return (ch.email || '').toLowerCase() === c.email.toLowerCase(); });
+          if (!chat) return '';
+          return '<button class="btn-mini" data-goto-chat="' + esc(chat.id) + '" style="margin:10px 0 2px">💬 Ver conversación con Lulu AI</button>';
+        })() +
         (function () {
           var emails = state.emailLog.filter(function (e) {
             return c.email && e.to_email && e.to_email.toLowerCase() === c.email.toLowerCase();
@@ -633,6 +647,15 @@
         '</div></div>';
     }).join('') || '<div class="empty-note">No customers yet.</div>';
 
+    Array.prototype.forEach.call(document.querySelectorAll('[data-goto-chat]'), function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-goto-chat');
+        state.chatSel = (state.chats || []).find(function (ch) { return ch.id === id; }) || null;
+        state.view = 'chats';
+        renderNav();
+        renderAll();
+      });
+    });
     Array.prototype.forEach.call(document.querySelectorAll('.customer-head'), function (b) {
       b.addEventListener('click', function () {
         var body = b.parentElement.querySelector('.customer-body');
@@ -735,6 +758,103 @@
       }).catch(function (err) { $('ms-save').disabled = false; $('ms-err').textContent = err.message; });
     });
   }
+
+  /* ---------- Lulu AI conversations (managers) ---------- */
+  function chatWho(c) {
+    return c.email || ('Visitante · ' + (c.visitor_id || '').slice(0, 8));
+  }
+  function fmtWhen(iso) {
+    var d = new Date(iso);
+    var today = new Date();
+    if (d.toDateString() === today.toDateString()) {
+      return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    }
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+  function renderChats() {
+    if (!isManager()) { $('chat-list').innerHTML = '<div class="empty-note">Managers only.</div>'; return; }
+    if (state.chatSel) { renderChatThread(); return; }
+    $('chat-thread-wrap').hidden = true;
+    $('chat-list').hidden = false;
+    S.listChats().then(function (chats) {
+      state.chats = chats || [];
+      if (!state.chats.length) {
+        $('chat-list').innerHTML = '<div class="empty-note">No Lulu AI conversations yet — they appear the moment someone talks to Lulu on the site or the app. 💬</div>';
+        return;
+      }
+      $('chat-list').innerHTML = state.chats.map(function (c) {
+        var initial = (c.email || 'V')[0].toUpperCase();
+        return '<button class="chat-card" data-chat="' + esc(c.id) + '">' +
+          '<span class="chat-avatar">' + esc(initial) + '</span>' +
+          '<span style="min-width:0;flex:1">' +
+          '<span class="chat-who">' + esc(chatWho(c)) + (c.source === 'app' ? ' · 📱' : ' · 🌐') + '</span>' +
+          '<div class="chat-prev" id="prev-' + esc(c.id) + '">…</div></span>' +
+          '<span class="chat-when">' + esc(fmtWhen(c.last_message_at)) + '</span></button>';
+      }).join('');
+      Array.prototype.forEach.call(document.querySelectorAll('[data-chat]'), function (b) {
+        b.addEventListener('click', function () {
+          state.chatSel = state.chats.find(function (c) { return c.id === b.getAttribute('data-chat'); });
+          renderChatThread();
+        });
+      });
+      // previews (last message per chat) — fetch lazily for the visible top 20
+      state.chats.slice(0, 20).forEach(function (c) {
+        S.listChatMessages(c.id).then(function (msgs) {
+          var last = msgs[msgs.length - 1];
+          var el = document.getElementById('prev-' + c.id);
+          if (el && last) el.textContent = (last.role === 'user' ? '👤 ' : last.role === 'staff' ? '👩‍🎨 ' : '🤖 ') + last.body.slice(0, 80);
+        }).catch(function () { /* ignore */ });
+      });
+    }).catch(function (err) {
+      $('chat-list').innerHTML = '<div class="empty-note">' + esc(err.message) + '</div>';
+    });
+  }
+  function renderChatThread() {
+    var c = state.chatSel;
+    if (!c) return;
+    $('chat-list').hidden = true;
+    $('chat-thread-wrap').hidden = false;
+    $('chat-thread-head').textContent = chatWho(c) + (c.source === 'app' ? ' · desde la app 📱' : ' · desde el sitio 🌐');
+    S.listChatMessages(c.id).then(function (msgs) {
+      var html = '';
+      var lastDay = '';
+      msgs.forEach(function (m) {
+        var day = new Date(m.created_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        if (day !== lastDay) { html += '<div class="chat-date-sep">' + esc(day) + '</div>'; lastDay = day; }
+        var who = m.role === 'user' ? 'them' : m.role === 'staff' ? 'staff' : 'lulu';
+        var cls = who === 'them' ? '' : who === 'staff' ? 'mine staff' : 'mine';
+        html += '<div class="bubble ' + cls + '">' +
+          '<div class="who">' + (who === 'them' ? '👤 Customer' : who === 'staff' ? '👩‍🎨 ' + esc(m.staff_name || 'Studio') : '🤖 Lulu AI') + '</div>' +
+          esc(m.body) +
+          ((m.meta && m.meta.actions) ? m.meta.actions.map(function (ac) {
+            if (ac.type === 'concept') return '<div class="meta-act">🎨 concept sketch shown</div>';
+            if (ac.type === 'checkout') return '<div class="meta-act">💳 checkout created · ' + esc(ac.code || '') + '</div>';
+            if (ac.type === 'orders') return '<div class="meta-act">📦 order list shown</div>';
+            return '';
+          }).join('') : '') +
+          '<div class="when">' + esc(new Date(m.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })) + '</div>' +
+          '</div>';
+      });
+      $('chat-thread').innerHTML = html || '<div class="empty-note">Empty conversation.</div>';
+      $('chat-thread').scrollTop = $('chat-thread').scrollHeight;
+    });
+  }
+  (function bindChatUI() {
+    var back = $('chat-back');
+    if (back) back.addEventListener('click', function () { state.chatSel = null; renderChats(); });
+    var sendBtn = $('chat-reply-send');
+    if (sendBtn) sendBtn.addEventListener('click', function () {
+      var body = $('chat-reply').value.trim();
+      if (!body || !state.chatSel) return;
+      sendBtn.disabled = true;
+      S.sendStaffChat(state.chatSel.id, body, state.me.name).then(function () {
+        $('chat-reply').value = '';
+        sendBtn.disabled = false;
+        renderChatThread();
+        toast('Sent — they\u2019ll see it in their Lulu chat 💬');
+      }).catch(function (err) { sendBtn.disabled = false; toast(err.message, true); });
+    });
+  })();
 
   /* ---------- Financials (owner) ----------
      Revenue is booked by when money actually arrived (paid stamps); shipping
@@ -1390,10 +1510,10 @@
   /* ---------- Views ---------- */
   var VIEW_RENDER = { board: renderBoard, team: renderTeam, pay: renderPayments,
     staff: renderStaff, tasks: renderTasks, mypieces: renderMyPieces, mytasks: renderMyTasks,
-    customers: renderCustomers, payouts: renderPayouts, financials: renderFinancials };
+    customers: renderCustomers, payouts: renderPayouts, financials: renderFinancials, chats: renderChats };
 
   function renderCurrentView() {
-    ['board', 'team', 'pay', 'staff', 'tasks', 'mypieces', 'mytasks', 'customers', 'payouts', 'financials'].forEach(function (v) {
+    ['board', 'team', 'pay', 'staff', 'tasks', 'mypieces', 'mytasks', 'customers', 'payouts', 'financials', 'chats'].forEach(function (v) {
       var el = $('view-' + v);
       if (el) el.classList.toggle('active', state.view === v);
     });

@@ -27,6 +27,10 @@ const AVATAR = require('./assets/lulu-avatar.png');
 const STAGE_LIST = ['New request', 'Quote review', 'In progress', 'Ready', 'Shipped'];
 const STAGES_ES = { 'New request': 'Nueva solicitud', 'Quote review': 'Cotización', 'In progress': 'En proceso', Ready: 'Lista', Shipped: 'Enviada' };
 
+function makeVisitorId() {
+  return 'app-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+}
+
 const HELLO = {
   role: 'lulu',
   text: '¡Hola! Soy Lulu 💗 Tejo piezas únicas a mano — muñecos, cobijas, regalos con historia. Cuéntame: ¿qué te gustaría que tejiera para ti? / Hi! I\'m Lulu — tell me what you\'d love me to crochet for you.',
@@ -45,6 +49,45 @@ export default function App() {
   const [authErr, setAuthErr] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const listRef = useRef(null);
+  const visitorRef = useRef(null);
+  const seenRef = useRef({});
+  const lastAtRef = useRef(null);
+
+  function mapServerMsg(m) {
+    const out = { role: m.role === 'user' ? 'me' : m.role === 'staff' ? 'staff' : 'lulu', text: m.body };
+    if (m.staff_name) out.staffName = m.staff_name;
+    for (const a of (m.meta && m.meta.actions) || []) {
+      if (a.type === 'concept') out.concept = a.url;
+      if (a.type === 'checkout') out.checkout = a;
+      if (a.type === 'orders') out.orders = a.orders;
+    }
+    return out;
+  }
+
+  async function syncHistory(sinceOnly) {
+    if (!visitorRef.current) return;
+    try {
+      const payload = { history: true, visitor_id: visitorRef.current };
+      if (sinceOnly && lastAtRef.current) payload.since = lastAtRef.current;
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/lulu-agent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).then((x) => x.json());
+      const fresh = (r && r.messages) || [];
+      if (!fresh.length) return;
+      setMessages((prev) => {
+        let base = sinceOnly ? [...prev] : [];
+        if (!sinceOnly) seenRef.current = {};
+        for (const m of fresh) {
+          if (seenRef.current[m.id]) continue;
+          seenRef.current[m.id] = true;
+          lastAtRef.current = m.created_at;
+          base.push(mapServerMsg(m));
+        }
+        return base.length ? base : [HELLO];
+      });
+    } catch (e) { /* offline — keep local view */ }
+  }
 
   useEffect(() => {
     sb.auth.getSession().then(({ data }) => setSession(data.session ?? null));
@@ -52,8 +95,19 @@ export default function App() {
     AsyncStorage.getItem('lulu.chat').then((raw) => {
       if (raw) { try { setMessages(JSON.parse(raw)); } catch (e) { /* keep default */ } }
     });
+    AsyncStorage.getItem('lulu.visitor').then((v) => {
+      if (!v) { v = makeVisitorId(); AsyncStorage.setItem('lulu.visitor', v).catch(() => {}); }
+      visitorRef.current = v;
+      syncHistory(false);
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (tab !== 'chat') return;
+    const iv = setInterval(() => { if (!thinking) syncHistory(true); }, 7000);
+    return () => clearInterval(iv);
+  }, [tab, thinking]);
 
   useEffect(() => {
     AsyncStorage.setItem('lulu.chat', JSON.stringify(messages.slice(-40))).catch(() => {});
@@ -82,14 +136,15 @@ export default function App() {
     setMessages(next);
     setThinking(true);
     try {
-      const history = next
-        .filter((m) => m.role === 'me' || m.role === 'lulu')
-        .slice(-16)
-        .map((m) => ({ role: m.role === 'me' ? 'user' : 'assistant', content: m.text }));
       const r = await fetch(`${SUPABASE_URL}/functions/v1/lulu-agent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history, jwt: session ? session.access_token : undefined }),
+        body: JSON.stringify({
+          visitor_id: visitorRef.current || (visitorRef.current = makeVisitorId()),
+          message: text,
+          source: 'app',
+          jwt: session ? session.access_token : undefined,
+        }),
       }).then((x) => x.json());
       const bubble = { role: 'lulu', text: r.reply || '…' };
       for (const a of r.actions || []) {
@@ -127,6 +182,17 @@ export default function App() {
   const renderBubble = ({ item }) => {
     if (item.role === 'me') {
       return <View style={[s.bubble, s.mine]}><Text style={s.myText}>{item.text}</Text></View>;
+    }
+    if (item.role === 'staff') {
+      return (
+        <View style={s.luluRow}>
+          <Image source={AVATAR} style={s.avatar} />
+          <View style={[s.bubble, s.hers]}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: C.deep, marginBottom: 2 }}>👩‍🎨 {item.staffName || 'Equipo del estudio'}</Text>
+            <Text style={s.herText}>{item.text}</Text>
+          </View>
+        </View>
+      );
     }
     return (
       <View style={s.luluRow}>
