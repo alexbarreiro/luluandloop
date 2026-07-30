@@ -14,10 +14,42 @@
   // Demo gate passphrase hash (see README to change); unused in cloud mode
   var PASS_HASH = '0f89c4839feb69124c67993c766c582abd71c3e3703e5073eae12e623ee75119';
 
+  function monthStartISO() {
+    var d = new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-01';
+  }
+  function todayISO() { return new Date().toISOString().slice(0, 10); }
+
   var state = { view: 'board', selected: null, me: null,
     profiles: [], orders: [], tasks: [], reports: [], payouts: [], shares: [],
     emailLog: [], thread: [], threadOrder: null,
-    shipRates: null, customerQuery: '', highlightTask: null };
+    shipRates: null, customerQuery: '', highlightTask: null,
+    payFilter: { q: '', status: 'all', from: '', to: '' },
+    finFrom: monthStartISO(), finTo: todayISO(),
+    stripeFin: null, stripeFinKey: '',
+    taskFilter: { q: '', status: 'all', who: 'all' } };
+
+  // CSV download helper — quotes every cell, BOM for Excel
+  function downloadCsv(filename, rows) {
+    var csv = '\ufeff' + rows.map(function (r) {
+      return r.map(function (c) {
+        return '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"';
+      }).join(',');
+    }).join('\r\n');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+  }
+  function inRange(iso, from, to) {
+    if (!iso) return false;
+    var d = String(iso).slice(0, 10);
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  }
 
   function $(id) { return document.getElementById(id); }
   function fmt(n) { return '$' + Math.round(n); }
@@ -186,7 +218,28 @@
   }
 
   /* ---------- Board (owner) ---------- */
+  function renderBoardTasks() {
+    var strip = $('board-tasks');
+    if (!strip) return;
+    var mine = state.tasks.filter(function (t) {
+      return t.assignee_id === state.me.id && (t.status === 'open' || t.status === 'rejected' || t.status === 'submitted');
+    });
+    if (state.view !== 'board' || !mine.length) { strip.hidden = true; return; }
+    strip.hidden = false;
+    strip.innerHTML = '<span class="bt-label">📋 Your tasks</span>' + mine.slice(0, 6).map(function (t) {
+      var waiting = t.status === 'submitted';
+      return '<span class="board-task-chip' + (waiting ? ' submitted' : '') + '">' + esc(t.title.slice(0, 44)) +
+        (t.due_date ? ' <span style="color:var(--muted)">· ' + esc(fmtDate(t.due_date)) + '</span>' : '') +
+        (waiting ? '<button disabled>waiting review</button>'
+          : '<button data-strip-submit="' + esc(t.id) + '">✓ Done</button>') + '</span>';
+    }).join('');
+    Array.prototype.forEach.call(strip.querySelectorAll('[data-strip-submit]'), function (b) {
+      b.addEventListener('click', function () { openSubmitModal(b.getAttribute('data-strip-submit')); });
+    });
+  }
+
   function renderBoard() {
+    renderBoardTasks();
     $('view-board').innerHTML = STAGES.map(function (name, i) {
       var cards = state.orders.filter(function (o) { return o.stage === i; });
       var cardsHtml = cards.map(function (o) {
@@ -221,15 +274,33 @@
         ev.stopPropagation();
         var o = state.orders.find(function (x) { return x.code === el.getAttribute('data-advance'); });
         if (!o) return;
-        var guardMsg = advanceGuard(o, Math.min(4, o.stage + 1));
+        var target = Math.min(4, o.stage + 1);
+        var guardMsg = advanceGuard(o, target);
         if (guardMsg) { toast(guardMsg, true); return; }
-        el.disabled = true;
-        S.updateOrder(o.code, { stage: Math.min(4, o.stage + 1) })
-          .then(refresh).then(renderAll)
-          .then(function () { toast(o.code.slice(-4) + ' → ' + STAGES[Math.min(4, o.stage + 1)]); })
-          .catch(function (err) { el.disabled = false; toast(err.message, true); });
+        confirmStageMove(o, target, function () {
+          el.disabled = true;
+          S.updateOrder(o.code, { stage: target })
+            .then(refresh).then(renderAll)
+            .then(function () { toast(o.code.slice(-4) + ' → ' + STAGES[target]); })
+            .catch(function (err) { el.disabled = false; toast(err.message, true); });
+        });
       });
     });
+  }
+
+  // Every stage move gets an explicit confirmation before it happens
+  function confirmStageMove(o, target, doIt) {
+    openModal('Move ' + o.code.slice(-4) + '?',
+      '<div class="modal-form">' +
+      '<div class="modal-task-recap">' + esc(o.item) + ' · ' + esc(o.customer) + '</div>' +
+      '<p style="font-size:14.5px;line-height:1.6;margin:4px 0 14px">Move this order from <b>' + esc(STAGES[o.stage]) + '</b> to <b>' + esc(STAGES[target]) + '</b>?' +
+      (target === 4 ? '<br><span style="color:var(--text-2);font-size:13px">The customer gets the shipping email with tracking.</span>' : '') + '</p>' +
+      '<div style="display:flex;gap:10px">' +
+      '<button class="btn-primary" id="cm-yes" style="flex:1">Yes, move it →</button>' +
+      '<button class="btn-mini" id="cm-no" style="flex:0 0 auto">Cancel</button>' +
+      '</div></div>');
+    $('cm-yes').addEventListener('click', function () { closeModal(); doIt(); });
+    $('cm-no').addEventListener('click', closeModal);
   }
 
   /* ---------- Team (owner) ---------- */
@@ -242,7 +313,8 @@
       var chipCls = load >= cap ? 'pinky' : load === 0 ? 'green' : 'soft';
       var chipLabel = load >= cap ? 'at capacity' : load === 0 ? 'free' : 'active';
       var piecesHtml = pieces.map(function (p) {
-        return '<div class="team-piece"><img src="' + esc(p.img) + '" alt="">' +
+        return '<div class="team-piece" data-open-order="' + esc(p.code) + '" role="button" tabindex="0">' +
+          '<img src="' + esc(p.img) + '" alt="">' +
           '<span class="team-piece-item">' + esc(p.item) + '</span>' +
           '<span class="team-piece-stage">' + esc(STAGES[p.stage].split(' ·')[0]) + '</span></div>';
       }).join('');
@@ -254,40 +326,66 @@
         '<div class="team-bar"><div class="team-bar-fill" style="width:' + pct + '%;background:' + (load >= cap ? '#E4657E' : safeColor(a.color)) + '"></div></div>' +
         '<div class="team-pieces">' + piecesHtml + '</div></div>';
     }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('#view-team [data-open-order]'), function (el) {
+      var open = function () { openDrawer(el.getAttribute('data-open-order')); };
+      el.addEventListener('click', open);
+      el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    });
   }
 
   /* ---------- Payments (owner) ---------- */
-  function renderPayments() {
+  function paymentRows() {
     var demo = S.mode === 'demo';
     var rows = [];
     state.orders.forEach(function (o) {
       if (depPaid(o)) {
-        rows.push({ item: o.item, customer: o.customer, type: 'Deposit 40%', amount: fmt(dep(o)),
+        rows.push({ date: o.deposit_paid_at || o.created_at || '', code: o.code, item: o.item,
+          customer: o.customer, type: 'Deposit 40%', amount: dep(o),
           status: 'succeeded', cls: 'green',
           ref: o.deposit_ref || (demo ? 'pi_3Q' + o.code.slice(-4) + 'dLx' : '—') });
       }
       if (balPaid(o)) {
         var shipAmt = Number(o.shipping) || 0;
-        rows.push({ item: o.item, customer: o.customer,
+        rows.push({ date: o.balance_paid_at || '', code: o.code, item: o.item, customer: o.customer,
           type: shipAmt > 0 ? 'Balance 60% + shipping' : 'Balance 60%',
-          amount: fmt(bal(o) + shipAmt),
+          amount: bal(o) + shipAmt,
           status: 'succeeded', cls: 'green',
           ref: o.balance_ref || (demo ? 'pi_3Q' + o.code.slice(-4) + 'bFn' : '—') });
       } else if (o.stage === 3) {
-        rows.push({ item: o.item, customer: o.customer, type: 'Balance 60%', amount: fmt(bal(o)),
+        rows.push({ date: o.balance_sent_at && o.balance_sent_at !== 'demo' ? o.balance_sent_at : '', code: o.code,
+          item: o.item, customer: o.customer, type: 'Balance 60%', amount: bal(o),
           status: o.balance_sent_at ? 'link sent · pending' : 'not requested',
           cls: o.balance_sent_at ? 'amber' : 'mute',
           ref: o.balance_sent_at ? (o.balance_session_id || 'plink_1R' + o.code.slice(-4)) : '—' });
       }
     });
+    rows.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+    return rows;
+  }
+  function filteredPayments() {
+    var f = state.payFilter;
+    var q = f.q.toLowerCase();
+    return paymentRows().filter(function (tx) {
+      if (q && (tx.code + ' ' + tx.item + ' ' + tx.customer + ' ' + tx.type + ' ' + tx.status + ' ' + tx.ref)
+        .toLowerCase().indexOf(q) === -1) return false;
+      if (f.status === 'succeeded' && tx.status !== 'succeeded') return false;
+      if (f.status === 'pending' && tx.status.indexOf('pending') === -1) return false;
+      if (f.status === 'not requested' && tx.status !== 'not requested') return false;
+      if ((f.from || f.to) && !inRange(tx.date, f.from, f.to)) return false;
+      return true;
+    });
+  }
+  function renderPayments() {
+    var rows = filteredPayments();
     $('pay-rows').innerHTML = rows.map(function (tx) {
-      return '<div class="pay-row"><span class="pay-item">' + esc(tx.item) + '</span>' +
+      return '<div class="pay-row"><span class="team-role">' + esc(tx.date ? fmtDate(tx.date) : '—') + '</span>' +
+        '<span class="pay-item">' + esc(tx.item) + '</span>' +
         '<span class="pay-cust">' + esc(tx.customer) + '</span>' +
         '<span class="pay-type">' + esc(tx.type) + '</span>' +
-        '<span class="pay-amount">' + tx.amount + '</span>' +
+        '<span class="pay-amount">' + fmt(tx.amount) + '</span>' +
         '<span><span class="chip ' + tx.cls + '">' + esc(tx.status) + '</span></span>' +
         '<span class="pay-ref">' + esc(String(tx.ref).slice(0, 22)) + '</span></div>';
-    }).join('') || '<div class="empty-note">No payments yet.</div>';
+    }).join('') || '<div class="empty-note">No payments match these filters.</div>';
   }
 
   /* ---------- Staff (owner) ---------- */
@@ -427,6 +525,13 @@
         '<button class="btn-mini approve" data-approve="' + esc(t.id) + '">Approve</button>' +
         '<button class="btn-mini reject" data-reject="' + esc(t.id) + '">Send back</button>';
     }
+    if (!forWorker && isOwner()) {
+      actions += '<select class="task-status-select" data-task="' + esc(t.id) + '" title="Set status directly">' +
+        ['open', 'submitted', 'approved', 'rejected'].map(function (st) {
+          var label = { open: 'Open', submitted: 'Waiting review', approved: 'Approved', rejected: 'Sent back' }[st];
+          return '<option value="' + st + '"' + (t.status === st ? ' selected' : '') + '>' + label + '</option>';
+        }).join('') + '</select>';
+    }
     return '<div class="task-card" data-task-id="' + esc(t.id) + '">' +
       '<div class="task-main">' +
       '<div class="task-title">' + esc(t.title) + '</div>' +
@@ -465,13 +570,45 @@
   }
 
   function renderTasks() {
+    // assignee filter options (rebuilt each render, selection preserved)
+    var whoSel = $('task-who');
+    var keepWho = state.taskFilter.who;
+    whoSel.innerHTML = '<option value="all">Everyone</option>' + state.profiles.filter(function (p) { return p.active; })
+      .map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.name.split(' ')[0]) + '</option>'; }).join('');
+    whoSel.value = keepWho;
+    if (whoSel.value !== keepWho) { whoSel.value = 'all'; state.taskFilter.who = 'all'; }
+
+    var f = state.taskFilter;
+    var q = f.q.toLowerCase();
     var order = { submitted: 0, open: 1, rejected: 2, approved: 3 };
-    var sorted = state.tasks.slice().sort(function (a, b) {
-      return (order[a.status] - order[b.status]) || String(a.due_date || '9').localeCompare(String(b.due_date || '9'));
-    });
+    var sorted = state.tasks.slice()
+      .filter(function (t) {
+        if (f.status !== 'all' && t.status !== f.status) return false;
+        if (f.who !== 'all' && t.assignee_id !== f.who) return false;
+        if (q) {
+          var who = profile(t.assignee_id);
+          if ((t.title + ' ' + (t.details || '') + ' ' + (t.order_code || '') + ' ' + (who ? who.name : ''))
+            .toLowerCase().indexOf(q) === -1) return false;
+        }
+        return true;
+      })
+      .sort(function (a, b) {
+        return (order[a.status] - order[b.status]) || String(a.due_date || '9').localeCompare(String(b.due_date || '9'));
+      });
     $('task-list').innerHTML = sorted.map(function (t) { return taskCard(t, false); }).join('') ||
-      '<div class="empty-note">No tasks yet — create the first content task.</div>';
+      '<div class="empty-note">No tasks match these filters.</div>';
     bindTaskActions($('task-list'), false);
+    // Lulu can override any task's status at any point
+    if (isOwner()) {
+      Array.prototype.forEach.call($('task-list').querySelectorAll('.task-status-select'), function (sel) {
+        sel.addEventListener('change', function () {
+          S.setTaskStatus(sel.getAttribute('data-task'), sel.value)
+            .then(refresh).then(renderAll)
+            .then(function () { toast('Task status updated'); })
+            .catch(function (e) { toast(e.message, true); });
+        });
+      });
+    }
   }
 
   function renderMyTasks() {
@@ -627,10 +764,15 @@
           : '<div class="cust-address muted">No shipping address on file yet (collected at deposit checkout).</div>') +
         ordersHtml +
         (function () {
-          if (!isManager() || !c.email || !state.chats) return '';
-          var chat = state.chats.find(function (ch) { return (ch.email || '').toLowerCase() === c.email.toLowerCase(); });
-          if (!chat) return '';
-          return '<button class="btn-mini" data-goto-chat="' + esc(chat.id) + '" style="margin:10px 0 2px">💬 Ver conversación con Lulu AI</button>';
+          if (!isManager() || !c.email) return '';
+          var btns = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 2px">' +
+            '<button class="btn-mini" data-edit-cust="' + esc(c.email) + '">✏️ Edit profile</button>' +
+            '<button class="btn-mini" data-reset-pass="' + esc(c.email) + '">🔑 Send password reset</button>';
+          var chat = state.chats && state.chats.find(function (ch) { return (ch.email || '').toLowerCase() === c.email.toLowerCase(); });
+          if (chat) btns += '<button class="btn-mini" data-goto-chat="' + esc(chat.id) + '">💬 Open full conversation</button>';
+          btns += '</div>';
+          if (chat) btns += '<div class="cust-chat-inline" data-chat-inline="' + esc(chat.id) + '">Loading conversation…</div>';
+          return btns;
         })() +
         (function () {
           var emails = state.emailLog.filter(function (e) {
@@ -660,11 +802,96 @@
       b.addEventListener('click', function () {
         var body = b.parentElement.querySelector('.customer-body');
         body.hidden = !body.hidden;
+        // lazy-load the inline Lulu AI / studio conversation on first expand
+        var inline = body.querySelector('[data-chat-inline]');
+        if (!body.hidden && inline && !inline.getAttribute('data-loaded')) {
+          inline.setAttribute('data-loaded', '1');
+          S.listChatMessages(inline.getAttribute('data-chat-inline')).then(function (msgs) {
+            inline.innerHTML = (msgs.slice(-6).map(function (m) {
+              var who = m.role === 'user' ? '👤' : m.role === 'staff' ? '👩‍🎨 ' + esc(m.staff_name || 'Studio') : '🤖 Lulu AI';
+              return '<div class="bubble' + (m.role === 'user' ? '' : ' mine') + '"><div class="who">' + who + '</div>' +
+                esc(m.body.slice(0, 220)) + '</div>';
+            }).join('') || 'Empty conversation.') +
+            '<div class="team-role" style="margin-top:4px">last ' + Math.min(6, msgs.length) + ' of ' + msgs.length + ' messages</div>';
+          }).catch(function () { inline.textContent = 'Conversation unavailable.'; });
+        }
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-edit-cust]'), function (b) {
+      b.addEventListener('click', function () { openCustomerModal(b.getAttribute('data-edit-cust')); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-reset-pass]'), function (b) {
+      b.addEventListener('click', function () {
+        var email = b.getAttribute('data-reset-pass');
+        openModal('Send password reset?',
+          '<div class="modal-form"><p style="font-size:14.5px;line-height:1.6;margin:0 0 14px">Email <b>' + esc(email) +
+          '</b> a secure link to set (or reset) their portal password?</p>' +
+          '<div style="display:flex;gap:10px"><button class="btn-primary" id="rp-yes" style="flex:1">Send it 💌</button>' +
+          '<button class="btn-mini" id="rp-no">Cancel</button></div>' +
+          '<div class="modal-error" id="modal-error"></div></div>');
+        $('rp-yes').addEventListener('click', function () {
+          $('rp-yes').disabled = true;
+          S.sendPasswordReset(email).then(function () { closeModal(); toast('Reset email sent to ' + email + ' ✓'); })
+            .catch(function (e) { $('rp-yes').disabled = false; $('modal-error').textContent = e.message; });
+        });
+        $('rp-no').addEventListener('click', closeModal);
       });
     });
     Array.prototype.forEach.call(document.querySelectorAll('[data-open-order]'), function (b) {
       b.addEventListener('click', function () { openDrawer(b.getAttribute('data-open-order')); });
     });
+  }
+
+  function openCustomerModal(email) {
+    S.getCustomerPrefs(email).then(function (prefs) {
+      prefs = prefs || {};
+      var st = prefs.ship_to || {};
+      openModal('Edit customer — ' + email,
+        '<form id="cust-form" class="modal-form">' +
+        '<label>Display name <input id="cf-name" value="' + esc(prefs.display_name || '') + '"></label>' +
+        '<div class="modal-two">' +
+        '<label>Language <select id="cf-lang"><option value="en"' + (prefs.lang !== 'es' ? ' selected' : '') + '>English</option>' +
+        '<option value="es"' + (prefs.lang === 'es' ? ' selected' : '') + '>Español</option></select></label>' +
+        '<label style="justify-content:end"><span>Marketing emails</span>' +
+        '<input id="cf-marketing" type="checkbox"' + (prefs.marketing !== false ? ' checked' : '') + ' style="width:18px;height:18px"></label>' +
+        '</div>' +
+        '<div class="toolbar-note" style="margin:6px 0 2px">📦 Shipping address — applies to their un-shipped orders (chosen rates reset so shipping gets re-quoted).</div>' +
+        '<label>Recipient <input id="cf-shipname" value="' + esc(prefs.ship_name || '') + '"></label>' +
+        '<label>Street <input id="cf-line1" value="' + esc(st.line1 || '') + '"></label>' +
+        '<label>Apt / unit <input id="cf-line2" value="' + esc(st.line2 || '') + '"></label>' +
+        '<div class="modal-two">' +
+        '<label>City <input id="cf-city" value="' + esc(st.city || '') + '"></label>' +
+        '<label>State <input id="cf-state" value="' + esc(st.state || '') + '"></label>' +
+        '</div>' +
+        '<div class="modal-two">' +
+        '<label>ZIP <input id="cf-zip" value="' + esc(st.postal_code || '') + '"></label>' +
+        '<label>Country (2 letters) <input id="cf-country" maxlength="2" value="' + esc(st.country || 'US') + '"></label>' +
+        '</div>' +
+        '<div class="modal-error" id="modal-error"></div>' +
+        '<button type="submit" class="btn-primary">Save customer</button>' +
+        '</form>');
+      $('cust-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var ship = {
+          line1: $('cf-line1').value.trim(), line2: $('cf-line2').value.trim(),
+          city: $('cf-city').value.trim(), state: $('cf-state').value.trim(),
+          postal_code: $('cf-zip').value.trim(), country: $('cf-country').value.trim().toUpperCase()
+        };
+        var anyShip = ship.line1 || ship.city || ship.postal_code;
+        if (anyShip && !(ship.line1 && ship.city && ship.postal_code)) {
+          $('modal-error').textContent = 'Street, city and ZIP are required to save an address.'; return;
+        }
+        S.updateCustomerPrefs(email, {
+          display_name: $('cf-name').value.trim(),
+          lang: $('cf-lang').value,
+          marketing: $('cf-marketing').checked,
+          ship_name: $('cf-shipname').value.trim(),
+          ship_to: anyShip ? ship : null
+        }).then(function () { closeModal(); return refresh(); }).then(renderAll)
+          .then(function () { toast('Customer saved ✓'); })
+          .catch(function (err) { $('modal-error').textContent = err.message; });
+      });
+    }).catch(function (e) { toast(e.message, true); });
   }
 
   /* ---------- Artisan payouts (owner) ----------
@@ -700,7 +927,10 @@
 
     $('payout-history').innerHTML = state.payouts.map(function (p) {
       var who = profile(p.artisan_id);
-      return '<div class="cust-order"><span class="cust-order-item"><b>' + esc(who ? who.name : '?') + '</b></span>' +
+      return '<div class="cust-order"><span class="cust-order-item"><b>' + esc(who ? who.name : '?') + '</b>' +
+        (p.note ? ' · <span class="team-role">' + esc(p.note) + '</span>' : '') + '</span>' +
+        (p.method ? '<span class="chip soft">' + esc(p.method) + '</span>' : '') +
+        (p.reference ? '<span class="chip mute" title="confirmation">#' + esc(p.reference) + '</span>' : '') +
         '<span class="cust-order-price">' + fmt(p.amount) + '</span>' +
         '<span class="team-role">' + esc(fmtDate(p.created_at)) + '</span></div>';
     }).join('') || '<div class="empty-note small">No payouts recorded yet.</div>';
@@ -708,7 +938,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-payout]'), function (b) {
       b.addEventListener('click', function () {
         var a = profile(b.getAttribute('data-payout'));
-        var amount = Number(b.getAttribute('data-amount'));
+        var owed = Number(b.getAttribute('data-amount'));
         // only list the orders not already covered by earlier payouts
         var already = {};
         state.payouts.forEach(function (p) {
@@ -717,11 +947,33 @@
         var shippedCodes = state.orders.filter(function (o) {
           return o.artisan_id === a.id && o.stage >= 4 && !already[o.code];
         }).map(function (o) { return o.code; });
-        b.disabled = true;
-        S.recordPayout(a.id, amount, shippedCodes)
-          .then(refresh).then(renderAll)
-          .then(function () { toast('Payout of ' + fmt(amount) + ' to ' + a.name + ' recorded'); })
-          .catch(function (err) { b.disabled = false; toast(err.message, true); });
+        openModal('Record payout — ' + a.name,
+          '<form id="payout-form" class="modal-form">' +
+          '<div class="modal-task-recap">Owed: <b>' + fmt(owed) + '</b> · covers ' + shippedCodes.length + ' shipped piece' + (shippedCodes.length === 1 ? '' : 's') + '</div>' +
+          '<div class="modal-two">' +
+          '<label>Amount (USD) <input id="po-amount" type="number" min="0.01" step="0.01" value="' + owed + '" required></label>' +
+          '<label>Method <select id="po-method">' +
+          ['Zelle', 'Bank transfer', 'Wise', 'PayPal', 'Remitly', 'Cash', 'Other'].map(function (m) {
+            return '<option value="' + m + '">' + m + '</option>';
+          }).join('') + '</select></label>' +
+          '</div>' +
+          '<label>Confirmation / reference # <input id="po-ref" placeholder="Zelle conf. #, SPEI clave de rastreo…"></label>' +
+          '<label>Note <span class="field-note">(optional)</span><input id="po-note" placeholder="July pieces"></label>' +
+          '<div class="modal-error" id="modal-error"></div>' +
+          '<button type="submit" class="btn-primary">Record payment ✓</button>' +
+          '</form>');
+        $('payout-form').addEventListener('submit', function (e) {
+          e.preventDefault();
+          var amount = parseFloat($('po-amount').value);
+          if (!(amount > 0)) { $('modal-error').textContent = 'Enter the amount paid.'; return; }
+          S.recordPayout(a.id, amount, shippedCodes, {
+            method: $('po-method').value,
+            reference: $('po-ref').value.trim(),
+            note: $('po-note').value.trim()
+          }).then(function () { closeModal(); return refresh(); }).then(renderAll)
+            .then(function () { toast('Payout of ' + fmt(amount) + ' to ' + a.name + ' recorded ✓'); })
+            .catch(function (err) { $('modal-error').textContent = err.message; });
+        });
       });
     });
   }
@@ -782,12 +1034,22 @@
         $('chat-list').innerHTML = '<div class="empty-note">No Lulu AI conversations yet — they appear the moment someone talks to Lulu on the site or the app. 💬</div>';
         return;
       }
+      // match identified chats (by email) to their customer record
+      var custByEmail = {};
+      state.orders.forEach(function (o) {
+        if (!o.email) return;
+        var k = o.email.toLowerCase();
+        var e = custByEmail[k] || (custByEmail[k] = { name: o.customer, count: 0 });
+        e.count += 1;
+      });
       $('chat-list').innerHTML = state.chats.map(function (c) {
         var initial = (c.email || 'V')[0].toUpperCase();
+        var cust = c.email && custByEmail[c.email.toLowerCase()];
         return '<button class="chat-card" data-chat="' + esc(c.id) + '">' +
           '<span class="chat-avatar">' + esc(initial) + '</span>' +
           '<span style="min-width:0;flex:1">' +
-          '<span class="chat-who">' + esc(chatWho(c)) + (c.source === 'app' ? ' · 📱' : ' · 🌐') + '</span>' +
+          '<span class="chat-who">' + esc(cust ? cust.name : chatWho(c)) + (c.source === 'app' ? ' · 📱' : ' · 🌐') + '</span>' +
+          (cust ? '<span class="chat-cust-tag">🧶 Customer · ' + cust.count + (cust.count === 1 ? ' order · ' : ' orders · ') + esc(c.email) + '</span>' : '') +
           '<div class="chat-prev" id="prev-' + esc(c.id) + '">…</div></span>' +
           '<span class="chat-when">' + esc(fmtWhen(c.last_message_at)) + '</span></button>';
       }).join('');
@@ -814,7 +1076,23 @@
     if (!c) return;
     $('chat-list').hidden = true;
     $('chat-thread-wrap').hidden = false;
-    $('chat-thread-head').textContent = chatWho(c) + (c.source === 'app' ? ' · desde la app 📱' : ' · desde el sitio 🌐');
+    var linkedName = null;
+    if (c.email) {
+      var match = state.orders.find(function (o) { return (o.email || '').toLowerCase() === c.email.toLowerCase(); });
+      if (match) linkedName = match.customer;
+    }
+    $('chat-thread-head').innerHTML = esc(linkedName || chatWho(c)) + (c.source === 'app' ? ' · desde la app 📱' : ' · desde el sitio 🌐') +
+      (linkedName
+        ? ' <button class="btn-mini" id="chat-goto-cust" style="margin-left:8px">🧶 View customer</button>'
+        : ' <span class="chip mute">visitante no identificado</span>');
+    var gc = $('chat-goto-cust');
+    if (gc) gc.addEventListener('click', function () {
+      state.customerQuery = c.email;
+      var si = $('customer-search'); if (si) si.value = c.email;
+      state.chatSel = null;
+      state.view = 'customers';
+      renderAll();
+    });
     S.listChatMessages(c.id).then(function (msgs) {
       var html = '';
       var lastDay = '';
@@ -856,11 +1134,63 @@
     });
   })();
 
+  /* ---------- Stripe-side financials (fees & net, straight from Stripe) ---------- */
+  function renderStripeFinancials() {
+    if (S.mode !== 'cloud') { $('fin-stripe-note').textContent = 'Stripe data appears in live mode.'; return; }
+    var key = (state.finFrom || 'x') + '|' + (state.finTo || 'x');
+    var $2 = function (n) { return '$' + (Math.round(n * 100) / 100).toFixed(2); };
+    function paint(fin) {
+      $('fin-stripe-tiles').innerHTML = [
+        { label: 'Stripe gross', value: $2(fin.totals.gross), sub: fin.totals.count + ' charges (test + live keys match the mode)' },
+        { label: 'Stripe fees', value: $2(fin.totals.fees), sub: 'processing fees taken by Stripe' },
+        { label: 'Stripe net', value: $2(fin.totals.net), sub: 'what actually lands in the bank' },
+        { label: 'Refunded', value: $2(fin.totals.refunded), sub: 'returned to customers' }
+      ].map(function (t) {
+        return '<div class="stat-tile"><div class="stat-label">' + esc(t.label) + '</div>' +
+          '<div class="stat-value display">' + esc(t.value) + '</div>' +
+          '<div class="stat-sub">' + esc(t.sub) + '</div></div>';
+      }).join('');
+      $('fin-stripe-note').textContent = '';
+    }
+    if (state.stripeFinKey === key && state.stripeFin) { paint(state.stripeFin); return; }
+    $('fin-stripe-note').textContent = 'Loading Stripe fees & net…';
+    S.stripeFinancials(state.finFrom || '2024-01-01', state.finTo || todayISO()).then(function (fin) {
+      state.stripeFin = fin; state.stripeFinKey = key;
+      if (state.view === 'financials') paint(fin);
+    }).catch(function (e) {
+      $('fin-stripe-tiles').innerHTML = '';
+      $('fin-stripe-note').textContent = 'Stripe data unavailable: ' + e.message;
+    });
+  }
+
+  function exportFinancialsCsv() {
+    var refFee = {};
+    ((state.stripeFin && state.stripeFin.charges) || []).forEach(function (c) {
+      if (c.payment_intent) refFee[c.payment_intent] = c;
+    });
+    var rows = [['Date', 'Order', 'Customer', 'Type', 'Amount USD', 'Stripe fee', 'Stripe net', 'Stripe ref']];
+    filteredForFinance().forEach(function (tx) {
+      var st = refFee[tx.ref];
+      rows.push([tx.date ? String(tx.date).slice(0, 10) : '', tx.code, tx.customer, tx.type,
+        tx.amount.toFixed(2), st ? st.fee.toFixed(2) : '', st ? st.net.toFixed(2) : '', tx.ref]);
+    });
+    downloadCsv('luluandloop-financials-' + (state.finFrom || 'all') + '-' + (state.finTo || 'today') + '.csv', rows);
+  }
+  function filteredForFinance() {
+    return paymentRows().filter(function (tx) {
+      return tx.status === 'succeeded' && ((!state.finFrom && !state.finTo) || inRange(tx.date, state.finFrom, state.finTo));
+    });
+  }
+
   /* ---------- Financials (owner) ----------
      Revenue is booked by when money actually arrived (paid stamps); shipping
      margin = collected − label cost (waived shipping shows as a loss);
      artisan share (40%) accrues when their piece ships. */
   function renderFinancials() {
+    var FROM = state.finFrom, TO = state.finTo;
+    $('fin-from').value = FROM || '';
+    $('fin-to').value = TO || '';
+    function within(iso) { return (!FROM && !TO) || inRange(iso, FROM, TO); }
     function monthKey(iso) {
       var d = new Date(iso);
       return iso && !isNaN(d)
@@ -880,18 +1210,18 @@
     state.profiles.forEach(function (p) { if (p.role === 'artisan') artisanIds[p.id] = true; });
 
     state.orders.forEach(function (o) {
-      if (o.deposit_paid_at) {
+      if (o.deposit_paid_at && within(o.deposit_paid_at)) {
         var mk = monthKey(o.deposit_paid_at);
         bucket(mk).deposits += dep(o);
         bucket(mk).orders += 1;
       }
-      if (o.balance_paid_at) {
+      if (o.balance_paid_at && within(o.balance_paid_at)) {
         var mb = monthKey(o.balance_paid_at);
         bucket(mb).balances += bal(o);
         bucket(mb).shipCollected += Number(o.shipping) || 0;
         if (o.shipping_cost != null) bucket(mb).shipCost += Number(o.shipping_cost);
       }
-      if (o.stage >= 4 && o.artisan_id && artisanIds[o.artisan_id]) {
+      if (o.stage >= 4 && o.artisan_id && artisanIds[o.artisan_id] && within(o.shipped_at)) {
         bucket(monthKey(o.shipped_at)).artisanShare += Number(o.price) * 0.4;
       }
     });
@@ -924,10 +1254,11 @@
         '<td>' + $2(tot.artisanShare) + '</td><td class="' + (totNet < 0 ? 'fin-neg' : '') + '"><b>' + $2(totNet) + '</b></td></tr>' : '');
 
     // summary tiles
-    var waivedLoss = state.orders.filter(function (o) { return o.shipping_waived && o.shipping_cost != null && o.balance_paid_at; })
+    var waivedLoss = state.orders.filter(function (o) { return o.shipping_waived && o.shipping_cost != null && o.balance_paid_at && within(o.balance_paid_at); })
       .reduce(function (s, o) { return s + Number(o.shipping_cost); }, 0);
+    var rangeLabel = (!FROM && !TO) ? 'all time' : (FROM || '…') + ' → ' + (TO || 'today');
     $('fin-tiles').innerHTML = [
-      { label: 'Collected (all time)', value: $2(tot.deposits + tot.balances + tot.shipCollected), sub: 'deposits + balances + shipping' },
+      { label: 'Collected (' + rangeLabel + ')', value: $2(tot.deposits + tot.balances + tot.shipCollected), sub: 'deposits + balances + shipping' },
       { label: 'Shipping margin', value: $2(totMargin), sub: totMargin < 0 ? 'includes courtesy waivers' : 'markup earned' },
       { label: 'Courtesy shipping given', value: $2(waivedLoss), sub: 'waived as a gift' },
       { label: 'Net after artisan share', value: $2(totNet), sub: '40% share on shipped pieces' }
@@ -936,6 +1267,8 @@
         '<div class="stat-value display">' + esc(s.value) + '</div>' +
         '<div class="stat-sub">' + esc(s.sub) + '</div></div>';
     }).join('');
+
+    renderStripeFinancials();
 
     // sales by region (from shipping addresses; falls back to the order's origin note)
     var regions = {};
@@ -1560,6 +1893,7 @@
       if (el) el.classList.toggle('active', state.view === v);
     });
     if (state.view === 'order' && !selectedOrder()) { state.view = isManager() ? 'board' : 'mypieces'; }
+    if (state.view !== 'board' && $('board-tasks')) $('board-tasks').hidden = true;
     (VIEW_RENDER[state.view] || function () {})();
   }
 
@@ -1679,6 +2013,33 @@
   });
   $('drawer-expand').addEventListener('click', openOrderPage);
   $('order-page-back').addEventListener('click', leaveOrderPage);
+
+  /* ---------- v12 toolbar bindings (filters + CSV exports) ---------- */
+  $('pay-search').addEventListener('input', function (e) { state.payFilter.q = e.target.value; renderPayments(); });
+  $('pay-status').addEventListener('change', function (e) { state.payFilter.status = e.target.value; renderPayments(); });
+  $('pay-from').addEventListener('change', function (e) { state.payFilter.from = e.target.value; renderPayments(); });
+  $('pay-to').addEventListener('change', function (e) { state.payFilter.to = e.target.value; renderPayments(); });
+  $('pay-export').addEventListener('click', function () {
+    var rows = [['Date', 'Order', 'Item', 'Customer', 'Type', 'Amount USD', 'Status', 'Stripe ref']];
+    filteredPayments().forEach(function (tx) {
+      rows.push([tx.date ? String(tx.date).slice(0, 10) : '', tx.code, tx.item, tx.customer,
+        tx.type, tx.amount.toFixed(2), tx.status, tx.ref]);
+    });
+    downloadCsv('luluandloop-payments-' + todayISO() + '.csv', rows);
+    toast('CSV downloaded ⬇');
+  });
+  $('fin-from').addEventListener('change', function (e) { state.finFrom = e.target.value; renderFinancials(); });
+  $('fin-to').addEventListener('change', function (e) { state.finTo = e.target.value; renderFinancials(); });
+  $('fin-this-month').addEventListener('click', function () {
+    state.finFrom = monthStartISO(); state.finTo = todayISO(); renderFinancials();
+  });
+  $('fin-all-time').addEventListener('click', function () {
+    state.finFrom = ''; state.finTo = ''; renderFinancials();
+  });
+  $('fin-export').addEventListener('click', function () { exportFinancialsCsv(); toast('CSV downloaded ⬇'); });
+  $('task-search').addEventListener('input', function (e) { state.taskFilter.q = e.target.value; renderTasks(); });
+  $('task-status').addEventListener('change', function (e) { state.taskFilter.status = e.target.value; renderTasks(); });
+  $('task-who').addEventListener('change', function (e) { state.taskFilter.who = e.target.value; renderTasks(); });
   $('modal-scrim').addEventListener('click', closeModal);
   $('modal-close').addEventListener('click', closeModal);
   document.addEventListener('keydown', function (e) {
@@ -1711,11 +2072,14 @@
   $('drawer-advance').addEventListener('click', function () {
     var o = selectedOrder();
     if (!o) return;
-    var guardMsg = advanceGuard(o, Math.min(4, o.stage + 1));
+    var target = Math.min(4, o.stage + 1);
+    var guardMsg = advanceGuard(o, target);
     if (guardMsg) { toast(guardMsg, true); return; }
-    S.updateOrder(o.code, { stage: Math.min(4, o.stage + 1) })
-      .then(refresh).then(renderAll)
-      .catch(function (err) { toast(err.message, true); });
+    confirmStageMove(o, target, function () {
+      S.updateOrder(o.code, { stage: target })
+        .then(refresh).then(renderAll)
+        .catch(function (err) { toast(err.message, true); });
+    });
   });
   $('btn-edit-quote').addEventListener('click', function () {
     var o = selectedOrder();

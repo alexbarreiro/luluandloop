@@ -371,13 +371,25 @@
       },
       listEmailLog: function () { return Promise.resolve([]); },
       listPayouts: function () { return Promise.resolve(get('luluandloop.demo.payouts', [])); },
-      recordPayout: function (artisanId, amount, orderCodes) {
+      recordPayout: function (artisanId, amount, orderCodes, extra) {
         var ps = get('luluandloop.demo.payouts', []);
         ps.unshift({ id: uid(), artisan_id: artisanId, amount: amount, order_codes: orderCodes || [],
+          method: (extra && extra.method) || '', reference: (extra && extra.reference) || '',
+          note: (extra && extra.note) || '',
           created_at: new Date().toISOString() });
         set('luluandloop.demo.payouts', ps);
         return Promise.resolve();
       },
+      setTaskStatus: function (taskId, status) {
+        var ts = get('luluandloop.demo.tasks', []);
+        var t = ts.find(function (x) { return x.id === taskId; });
+        if (t) { t.status = status; set('luluandloop.demo.tasks', ts); }
+        return Promise.resolve();
+      },
+      getCustomerPrefs: function () { return Promise.resolve(null); },
+      updateCustomerPrefs: function () { return Promise.resolve(); },
+      sendPasswordReset: function () { return Promise.reject(new Error('Needs the live backend')); },
+      stripeFinancials: function () { return Promise.reject(new Error('Stripe data needs the live backend')); },
       listCustomerUploads: function (orderCode) {
         var ups = get('luluandloop.demo.shares', []);
         return Promise.resolve(ups.filter(function (u) { return !orderCode || u.order_code === orderCode; }));
@@ -670,11 +682,54 @@
           if (r.error) fail(r.error); return r.data;
         });
       },
-      recordPayout: function (artisanId, amount, orderCodes) {
+      recordPayout: function (artisanId, amount, orderCodes, extra) {
         return sb().from('payouts').insert({
           artisan_id: artisanId, amount: amount, order_codes: orderCodes || [],
+          method: (extra && extra.method) || '', reference: (extra && extra.reference) || '',
+          note: (extra && extra.note) || '',
           created_by: meCache ? meCache.id : null
         }).then(function (r) { if (r.error) fail(r.error); });
+      },
+      setTaskStatus: function (taskId, status) {
+        return sb().from('tasks').update({
+          status: status,
+          reviewed_by: meCache ? meCache.id : null,
+          reviewed_at: new Date().toISOString()
+        }).eq('id', taskId).then(function (r) { if (r.error) fail(r.error); });
+      },
+      getCustomerPrefs: function (email) {
+        return sb().from('customer_prefs').select('*').eq('email', String(email).toLowerCase())
+          .maybeSingle().then(function (r) { if (r.error) fail(r.error); return r.data; });
+      },
+      updateCustomerPrefs: function (email, prefs) {
+        var key = String(email).toLowerCase();
+        var row = {
+          email: key,
+          display_name: prefs.display_name || '',
+          lang: prefs.lang === 'es' ? 'es' : 'en',
+          marketing: prefs.marketing !== false,
+          updated_at: new Date().toISOString()
+        };
+        if (prefs.ship_to) { row.ship_to = prefs.ship_to; row.ship_name = prefs.ship_name || null; }
+        return sb().from('customer_prefs').upsert(row).then(function (r) {
+          if (r.error) fail(r.error);
+          if (!prefs.ship_to) return;
+          // keep un-shipped, un-priced orders in sync; stale rates must be re-quoted
+          return sb().from('orders').update({
+            shipping_address: prefs.ship_to, shipping_name: prefs.ship_name || null,
+            shipping_rate: null, shipping_cost: null
+          }).eq('email', key).is('shipped_at', null).is('label_url', null)
+            .is('balance_sent_at', null).is('balance_paid_at', null)
+            .then(function (r2) { if (r2.error) fail(r2.error); });
+        });
+      },
+      sendPasswordReset: function (email) {
+        return sb().auth.resetPasswordForEmail(String(email).toLowerCase(), {
+          redirectTo: 'https://luluandloop.com/orders/'
+        }).then(function (r) { if (r.error) fail(r.error); });
+      },
+      stripeFinancials: function (from, to) {
+        return callFn('stripe-financials', { from: from, to: to });
       },
       listCustomerUploads: function () {
         return sb().from('customer_uploads').select('*, orders(code)').order('created_at', { ascending: false })

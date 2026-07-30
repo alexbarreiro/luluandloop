@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,400;0,6..12,600;0,6..12,700;0,6..12,800;0,6..12,900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/studio.css?v=20260731e">
+<link rel="stylesheet" href="/css/studio.css?v=20260731f">
 </head>
 <body>
 
@@ -67,12 +67,25 @@
 
     <div class="stats" id="stats"></div>
 
+    <div class="board-tasks" id="board-tasks" hidden></div>
     <div class="board view" id="view-board"></div>
     <div class="team-grid view" id="view-team"></div>
     <div class="view" id="view-pay">
+      <div class="view-toolbar filter-bar">
+        <input type="search" id="pay-search" class="search-input" placeholder="Search order, customer, type, ref…">
+        <select id="pay-status" class="filter-select">
+          <option value="all">All statuses</option>
+          <option value="succeeded">Succeeded</option>
+          <option value="pending">Link sent · pending</option>
+          <option value="not requested">Not requested</option>
+        </select>
+        <label class="filter-date">From <input type="date" id="pay-from"></label>
+        <label class="filter-date">To <input type="date" id="pay-to"></label>
+        <button class="btn-mini" id="pay-export">⬇ Export CSV</button>
+      </div>
       <div class="pay-table">
         <div class="pay-head">
-          <span>Order</span><span>Customer</span><span>Type</span><span>Amount</span><span>Status</span><span>Stripe ref</span>
+          <span>Date</span><span>Order</span><span>Customer</span><span>Type</span><span>Amount</span><span>Status</span><span>Stripe ref</span>
         </div>
         <div id="pay-rows"></div>
       </div>
@@ -84,9 +97,17 @@
       <div class="staff-grid" id="staff-grid"></div>
     </div>
     <div class="view" id="view-tasks">
-      <div class="view-toolbar">
+      <div class="view-toolbar filter-bar">
         <button class="btn-primary" id="btn-add-task">＋ New task</button>
-        <span class="toolbar-note">Content engine: every commission produces its own content — reels, stories, reveals. Tag #HechoConLulu.</span>
+        <input type="search" id="task-search" class="search-input" placeholder="Search tasks…">
+        <select id="task-status" class="filter-select">
+          <option value="all">All statuses</option>
+          <option value="open">Open</option>
+          <option value="submitted">Waiting review</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Sent back</option>
+        </select>
+        <select id="task-who" class="filter-select"><option value="all">Everyone</option></select>
       </div>
       <div class="task-list" id="task-list"></div>
     </div>
@@ -122,7 +143,16 @@
       <div id="order-page-slot"></div>
     </div>
     <div class="view" id="view-financials">
+      <div class="view-toolbar filter-bar">
+        <label class="filter-date">From <input type="date" id="fin-from"></label>
+        <label class="filter-date">To <input type="date" id="fin-to"></label>
+        <button class="btn-mini" id="fin-this-month">This month</button>
+        <button class="btn-mini" id="fin-all-time">All time</button>
+        <button class="btn-mini" id="fin-export">⬇ Export CSV</button>
+        <span class="toolbar-note" id="fin-stripe-note"></span>
+      </div>
       <div class="fin-tiles" id="fin-tiles"></div>
+      <div class="fin-tiles" id="fin-stripe-tiles"></div>
       <p class="fin-section-title">Month by month</p>
       <div class="fin-table"><table id="fin-monthly"></table></div>
       <p class="fin-section-title">Sales by region</p>
@@ -230,9 +260,9 @@
 
 <div id="toast-region" role="status" aria-live="assertive" aria-atomic="true"></div>
 
-<script src="/js/config.js?v=20260731e"></script>
+<script src="/js/config.js?v=20260731f"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="/js/api.js?v=20260731e"></script>
-<script src="/js/studio.js?v=20260731e"></script>
+<script src="/js/api.js?v=20260731f"></script>
+<script src="/js/studio.js?v=20260731f"></script>
 </body>
 </html>
